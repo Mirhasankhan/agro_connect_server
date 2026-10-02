@@ -205,59 +205,115 @@ export class OrderService {
                 ? session.payment_intent
                 : undefined;
 
-        await this.prisma.$transaction(async (transaction) => {
-            const order = await transaction.order.findUnique({
-                where: { id: orderId },
-                include: { items: true },
-            });
+        try {
+            await this.prisma.$transaction(async (transaction) => {
+                const order = await transaction.order.findUnique({
+                    where: { id: orderId },
+                    include: { items: true },
+                });
 
-            if (!order || order.paymentStatus === "Paid") {
-                return;
-            }
+                if (
+                    !order ||
+                    order.paymentStatus === "Paid" ||
+                    order.paymentStatus === "Refunded" ||
+                    order.paymentStatus === "Failed"
+                ) {
+                    return;
+                }
 
-            await transaction.order.update({
-                where: { id: order.id },
-                data: {
-                    status: "Active",
-                    paymentStatus: "Paid",
-                    ...(paymentIntentId
-                        ? { stripePaymentIntentId: paymentIntentId }
-                        : {}),
-                },
-            });
-
-            for (const item of order.items) {
-                const result = await transaction.product.updateMany({
-                    where: {
-                        id: item.productId,
-                        availableQuantity: {
-                            gte: item.quantity,
-                        },
-                    },
+                await transaction.order.update({
+                    where: { id: order.id },
                     data: {
-                        availableQuantity: {
-                            decrement: item.quantity,
-                        },
+                        status: "Active",
+                        paymentStatus: "Paid",
+                        ...(paymentIntentId
+                            ? { stripePaymentIntentId: paymentIntentId }
+                            : {}),
                     },
                 });
 
-                if (result.count === 0) {
-                    throw new ApiError(
-                        HttpStatus.BAD_REQUEST,
-                        `Insufficient quantity available for ${item.productName}`,
-                    );
+                for (const item of order.items) {
+                    const result = await transaction.product.updateMany({
+                        where: {
+                            id: item.productId,
+                            availableQuantity: {
+                                gte: item.quantity,
+                            },
+                        },
+                        data: {
+                            availableQuantity: {
+                                decrement: item.quantity,
+                            },
+                        },
+                    });
+
+                    if (result.count === 0) {
+                        throw new ApiError(
+                            HttpStatus.BAD_REQUEST,
+                            `Insufficient quantity available for ${item.productName}`,
+                        );
+                    }
                 }
+
+                await transaction.cart.deleteMany({
+                    where: {
+                        userId: order.customerId,
+                        productId: {
+                            in: order.items.map((item) => item.productId),
+                        },
+                    },
+                });
+            });
+        } catch (processingError) {
+            if (!paymentIntentId) {
+                await this.prisma.order.updateMany({
+                    where: { id: orderId },
+                    data: {
+                        status: "Cancelled",
+                        paymentStatus: "Failed",
+                        cancelReason: "Payment processing failed",
+                    },
+                });
+
+                throw processingError;
             }
 
-            await transaction.cart.deleteMany({
-                where: {
-                    userId: order.customerId,
-                    productId: {
-                        in: order.items.map((item) => item.productId),
+            try {
+                await this.stripe.refundPaymentIntent(
+                    paymentIntentId,
+                    `order-refund-${orderId}`,
+                );
+
+                await this.prisma.$transaction([
+                    this.prisma.order.update({
+                        where: { id: orderId },
+                        data: {
+                            status: "Refunded",
+                            paymentStatus: "Refunded",
+                            stripePaymentIntentId: paymentIntentId,
+                            cancelReason:
+                                "Payment refunded because order processing failed",
+                        },
+                    }),
+                    this.prisma.orderItem.updateMany({
+                        where: { orderId },
+                        data: { status: "Refunded" },
+                    }),
+                ]);
+            } catch (refundError) {
+                await this.prisma.order.updateMany({
+                    where: { id: orderId },
+                    data: {
+                        status: "Cancelled",
+                        paymentStatus: "Failed",
+                        stripePaymentIntentId: paymentIntentId,
+                        cancelReason: "Payment refund failed",
                     },
-                },
-            });
-        });
+                });
+
+                throw refundError;
+            }
+        }
     }
 
     private async markOrderAsFailed(session: Stripe.Checkout.Session) {
