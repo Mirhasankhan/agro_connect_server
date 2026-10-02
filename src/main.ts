@@ -4,7 +4,6 @@ import cookieParser from "cookie-parser";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "@/app/app.module";
 import type { Request, Response } from "express";
-import * as express from "express";
 import config from "./config";
 
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
@@ -23,7 +22,6 @@ async function bootstrap() {
 
     // --- Middlewares & Config ---
     app.use(cookieParser());
-    app.use("/api/v1/webhook", express.raw({ type: "application/json" }));
     app.setGlobalPrefix("api/v1");
 
     // --- CORS ---
