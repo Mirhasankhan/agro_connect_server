@@ -1,0 +1,297 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mongodb"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id               String         @id @default(auto()) @map("_id") @db.ObjectId
+    fullName         String
+    email            String         @unique
+    password         String
+    phone            String
+    role             UserRole
+    status           ActivityStatus @default(ACTIVE)
+    deleted          Boolean        @default(false)
+    isSetupCompleted Boolean        @default(false)
+    profileImage     String?
+    fcmToken         String?
+    stripeCustomerId String?
+
+    createdAt         DateTime          @default(now())
+    updatedAt         DateTime          @updatedAt
+    shippingAddresses ShippingAddress[]
+    producerProfile   ProducerProfile?
+    products          Product[]
+    carts             Cart[]
+    wishlists         Wishlist[]
+    orders            Order[]
+
+    @@map("users")
+}
+
+model RegistrationVerification {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    fullName  String
+    email     String   @unique
+    password  String
+    phone     String
+    role      UserRole
+    otpHash   String
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+}
+
+model ProducerProfile {
+    id     String @id @default(auto()) @map("_id") @db.ObjectId
+    userId String @unique @db.ObjectId
+    user   User   @relation(fields: [userId], references: [id])
+
+    // Basic producer information
+    farmName     String?
+    producerType ProducerType
+    farmSize     String?
+
+    // Location
+    address  String
+    district String
+
+    // Production information
+    productionTypes String[]
+
+    // Verification documents
+    nidNumber    String?
+    tradeLicense String?
+    tinNumber    String?
+
+    // Verification
+    verificationStatus VerificationStatus @default(Pending)
+    rejectionReason    String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+enum ProducerType {
+    Individual
+    Farm
+    Business
+}
+
+enum VerificationStatus {
+    Pending
+    Accepted
+    Rejected
+}
+
+model Otp {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    email     String   @unique
+    otpHash   String
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("otps")
+}
+
+model ShippingAddress {
+    id          String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId      String   @db.ObjectId
+    addressLine String
+    city        String
+    postCode    String
+    country     String
+    instruction String
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    orders      Order[]
+
+    @@map("shipping_Addresses")
+}
+
+model Category {
+    id          String  @id @default(auto()) @map("_id") @db.ObjectId
+    name        String
+    slug        String  @unique
+    description String
+    imageUrl    String
+    isActive    Boolean @default(true)
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    products  Product[]
+}
+
+model Product {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    producerId String   @db.ObjectId
+    producer   User     @relation(fields: [producerId], references: [id], onDelete: Cascade)
+    categoryId String   @db.ObjectId
+    category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+    name              String
+    description       String
+    imageUrls         String[]
+    sellingUnit       SellingUnit
+    pricePerUnit      Float
+    availableQuantity Int
+
+    pricingTiers PricingTier[]
+    isFeatured   Boolean       @default(false)
+    isActive     Boolean       @default(true)
+    avgRating    Float         @default(0)
+    totalReviews Int           @default(0)
+
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+    carts      Cart[]
+    wishlists  Wishlist[]
+    orderItems OrderItem[]
+}
+
+model PricingTier {
+    id           String  @id @default(auto()) @map("_id") @db.ObjectId
+    productId    String  @db.ObjectId
+    product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+    quantity     Int
+    pricePerUnit Float
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Cart {
+    id        String @id @default(auto()) @map("_id") @db.ObjectId
+    userId    String @db.ObjectId
+    productId String @db.ObjectId
+    quantity  Int    @default(1)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, productId])
+    @@map("carts")
+}
+
+model Wishlist {
+    id        String @id @default(auto()) @map("_id") @db.ObjectId
+    userId    String @db.ObjectId
+    productId String @db.ObjectId
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, productId])
+    @@map("wishlists")
+}
+
+model Order {
+    id                    String        @id @default(auto()) @map("_id") @db.ObjectId
+    orderId               String
+    customerId            String        @db.ObjectId
+    totalAmount           Float
+    status                OrderStatus   @default(Pending)
+    stripePaymentIntentId String?
+    paymentStatus         PaymentStatus @default(Pending)
+
+    cancelReason      String?
+    shippingAddressId String  @db.ObjectId
+
+    customer        User            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+    shippingAddress ShippingAddress @relation(fields: [shippingAddressId], references: [id], onDelete: NoAction)
+
+    items OrderItem[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("orders")
+}
+
+model OrderItem {
+    id        String @id @default(auto()) @map("_id") @db.ObjectId
+    orderId   String @db.ObjectId
+    productId String @db.ObjectId
+
+    productName String
+    sellingUnit SellingUnit
+    quantity    Int
+
+    unitPrice Float
+    subtotal  Float
+
+    cancelReason String?
+    isReviewed   Boolean    @default(false)
+    status       ItemStatus @default(Pending)
+
+    order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    product Product @relation(fields: [productId], references: [id], onDelete: NoAction)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("orderItems")
+}
+
+enum OrderStatus {
+    Pending
+    Active
+    PartiallyCancelled
+    Shipped
+    Delivered
+    Cancelled
+    Refunded
+}
+
+enum ItemStatus {
+    Pending
+    SentToHub
+    Delivered
+    Cancelled
+    Refunded
+}
+
+enum PaymentStatus {
+    Pending
+    Paid
+    Failed
+    PartiallyRefunded
+    Refunded
+}
+
+enum SellingUnit {
+    KG
+    GRAM
+    PIECE
+    DOZEN
+    LITER
+    BAG
+    BUNDLE
+}
+
+// ---------------- ENUM ----------------
+
+enum UserRole {
+    ADMIN
+    PRODUCER
+    BUYER
+    DRIVER
+}
+
+enum ActivityStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}

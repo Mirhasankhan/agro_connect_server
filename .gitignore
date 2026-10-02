@@ -1,0 +1,29 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output and generated TypeScript metadata
+dist/
+*.tsbuildinfo
+
+# Runtime uploads and logs
+uploads/
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test and coverage output
+coverage/
+.nyc_output/
+
+# Local tooling and operating-system files
+.eslintcache
+.DS_Store
+Thumbs.db
