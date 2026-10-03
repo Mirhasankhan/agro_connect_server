@@ -6,8 +6,10 @@ import {
     IsOptional,
     IsArray,
     IsEnum,
+    IsNotEmpty,
+    IsDateString,
 } from "class-validator";
-import { UserRole, ProducerType } from "@prisma/client";
+import { UserRole, ProducerType, DriverVehicleType } from "@prisma/client";
 
 export class RegisterUserDto {
     @IsString()
@@ -123,4 +125,40 @@ export class CreateProducerProfileDto {
     @IsOptional()
     @IsString()
     tinNumber?: string;
+}
+
+export class CreateDriverProfileDto { 
+  @IsString()
+  @IsNotEmpty()
+  nidNumber: string;
+
+  @IsDateString()
+  dateOfBirth: string;
+
+  @IsString()
+  @IsNotEmpty()
+  drivingLicenseNumber: string;
+
+  @IsEnum(DriverVehicleType)
+  vehicleType: DriverVehicleType;
+
+  @IsString()
+  @IsNotEmpty()
+  vehicleRegistration: string;
+
+  @IsString()
+  @IsNotEmpty()
+  vehicleModel: string;
+
+  @IsString()
+  @IsNotEmpty()
+  vehicleColor: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  district: string;
 }

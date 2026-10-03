@@ -1,18 +1,27 @@
-import { IsBoolean, IsOptional, IsString,  IsMongoId, } from "class-validator";
+import {
+    DriverVehicleType,
+    ProducerType,
+    VerificationStatus,
+} from "@prisma/client";
+import {
+    IsBoolean,
+    IsOptional,
+    IsString,
+    IsMongoId,
+    IsEnum,
+} from "class-validator";
 
 export class AcceptRejectProducerAccountDto {
-
     @IsMongoId()
-    producerId: string
+    producerId: string;
 
     @IsBoolean()
-    isAccept: boolean
+    isAccept: boolean;
 
     @IsOptional()
     @IsString()
-    rejectReason?: string
+    rejectReason?: string;
 }
-
 
 export class CategoryDto {
     @IsString()
@@ -23,5 +32,38 @@ export class CategoryDto {
 
     @IsString()
     description: string;
-    
+}
+
+export class BaseUserQueryDto {
+    @IsOptional()
+    @IsString()
+    search?: string;
+
+    @IsOptional()
+    @IsEnum(["asc", "desc"])
+    order?: "asc" | "desc";
+
+    @IsOptional()
+    @IsString()
+    page?: string;
+
+    @IsOptional()
+    @IsEnum(VerificationStatus)
+    verificationStatus?: VerificationStatus;
+
+    @IsOptional()
+    @IsString()
+    limit?: string;
+}
+
+export class ProducerQueryDto extends BaseUserQueryDto {
+    @IsOptional()
+    @IsEnum(ProducerType)
+    producerType?: ProducerType;
+}
+
+export class DriverQueryDto extends BaseUserQueryDto {
+    @IsOptional()
+    @IsEnum(DriverVehicleType)
+    vehicleType?: DriverVehicleType;
 }

@@ -272,17 +272,17 @@ class QueryBuilder<
         exacts = [],
         booleans = [],
         exclude = [],
+        nestedFields = {},
     }: {
         exacts?: (
             EnumKeys<Awaited<ReturnType<Model["findMany"]>>[0]> | (string & {})
         )[];
-
         booleans?: (
             | BooleanKeys<Awaited<ReturnType<Model["findMany"]>>[0]>
             | (string & {})
         )[];
-
         exclude?: string[];
+        nestedFields?: Record<string, string>;
     } = {}) {
         const queryObj = { ...this.query };
 
@@ -300,13 +300,15 @@ class QueryBuilder<
                 continue;
             }
 
+            // Map query field to Prisma field
+            const prismaField = nestedFields[field] ?? field;
+
             // null
             if (value === "null") {
                 Object.assign(
                     formattedFilters,
-                    this.buildNestedCondition(field, null),
+                    this.buildNestedCondition(prismaField, null),
                 );
-
                 continue;
             }
 
@@ -314,11 +316,10 @@ class QueryBuilder<
             if (value === "notnull") {
                 Object.assign(
                     formattedFilters,
-                    this.buildNestedCondition(field, {
+                    this.buildNestedCondition(prismaField, {
                         not: null,
                     }),
                 );
-
                 continue;
             }
 
@@ -326,11 +327,10 @@ class QueryBuilder<
             if ((exacts as string[]).includes(field)) {
                 Object.assign(
                     formattedFilters,
-                    this.buildNestedCondition(field, {
+                    this.buildNestedCondition(prismaField, {
                         equals: value,
                     }),
                 );
-
                 continue;
             }
 
@@ -344,16 +344,15 @@ class QueryBuilder<
 
                 Object.assign(
                     formattedFilters,
-                    this.buildNestedCondition(field, value === "true"),
+                    this.buildNestedCondition(prismaField, value === "true"),
                 );
-
                 continue;
             }
 
             // Default string contains filter
             Object.assign(
                 formattedFilters,
-                this.buildNestedCondition(field, {
+                this.buildNestedCondition(prismaField, {
                     contains: String(value),
                     mode: "insensitive",
                 }),
@@ -577,32 +576,17 @@ class QueryBuilder<
     }
 
     sort() {
-        const rawOrder = this.query.order;
+        const sortField = this.query.sort
+            ? String(this.query.sort)
+            : "createdAt";
 
-        const sort = rawOrder
-            ? String(rawOrder).split(",").filter(Boolean)
-            : ["-createdAt"];
+        const order = this.query.order
+            ? String(this.query.order).toLowerCase()
+            : "desc";
 
-        if (this.query.sort) {
-            sort.push(
-                this.query.sort === "newest" ? "-createdAt" : "createdAt",
-            );
-        }
-
-        const orderBy = sort.reduce<Record<string, "asc" | "desc">>(
-            (acc, field) => {
-                if (field.startsWith("-")) {
-                    acc[field.slice(1)] = "desc";
-                } else {
-                    acc[field] = "asc";
-                }
-
-                return acc;
-            },
-            {},
-        );
-
-        this.prismaQuery.orderBy = orderBy;
+        this.prismaQuery.orderBy = {
+            [sortField]: order === "asc" ? "asc" : "desc",
+        };
 
         return this;
     }

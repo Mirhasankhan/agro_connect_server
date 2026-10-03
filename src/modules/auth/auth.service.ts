@@ -8,6 +8,7 @@ import config from "@/config";
 import { emailBody, resetPasswordEmail } from "./auth.template";
 import {
     ChangePasswordDto,
+    CreateDriverProfileDto,
     CreateProducerProfileDto,
     LoginUserDto,
     RefreshTokenDto,
@@ -21,7 +22,6 @@ import { UserPayload } from "@/common/guards/auth.guard";
 import { background } from "@/common/utils/background";
 import sendEmail from "@/core/services/email";
 import { FileService } from "@/core/services/files/cloudinary.service";
-
 
 @Injectable()
 export class AuthService {
@@ -512,6 +512,53 @@ export class AuthService {
 
         return {
             message: "Producer profile created successfully",
+        };
+    }
+
+    async createDriverProfile(
+        user: UserPayload,
+        payload: CreateDriverProfileDto,
+        file?: Express.Multer.File,
+    ) {
+        const existingProfile = await this.prisma.driverProfile.findUnique({
+            where: {
+                userId: user.id,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (existingProfile) {
+            throw new ApiError(
+                HttpStatus.CONFLICT,
+                "Driver profile already exists!",
+            );
         }
+
+        let licenseUrl = null;
+
+        if (file) {
+            licenseUrl = await this.fileService.uploadToCloudinary(file);
+        }
+
+        if (!licenseUrl) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "License is required for Driver",
+            );
+        }
+
+        await this.prisma.driverProfile.create({
+            data: {
+                userId: user.id,
+                licenseUrl,
+                ...payload,
+            },
+        });
+
+        return {
+            message: "Driver profile created successfully",
+        };
     }
 }

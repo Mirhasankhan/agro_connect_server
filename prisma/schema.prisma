@@ -29,6 +29,7 @@ model User {
     carts             Cart[]
     wishlists         Wishlist[]
     orders            Order[]
+    driverProfile     DriverProfile?
 
     @@map("users")
 }
@@ -75,6 +76,37 @@ model ProducerProfile {
     updatedAt DateTime @updatedAt
 }
 
+model DriverProfile {
+    id          String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId      String   @unique @db.ObjectId
+    user        User     @relation(fields: [userId], references: [id])
+    // Personal / identity information
+    nidNumber   String
+    dateOfBirth DateTime
+
+    // Driving information
+    drivingLicenseNumber String
+    licenseUrl           String
+
+    // Vehicle information
+    vehicleType         DriverVehicleType
+    vehicleRegistration String
+    vehicleModel        String
+    vehicleColor        String
+
+    // Location
+    address  String?
+    district String
+
+    // Verification
+    verificationStatus VerificationStatus @default(Pending)
+    rejectionReason    String?
+    isAvailable        Boolean            @default(false)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
 enum ProducerType {
     Individual
     Farm
@@ -85,6 +117,15 @@ enum VerificationStatus {
     Pending
     Accepted
     Rejected
+}
+
+enum DriverVehicleType {
+    BIKE
+    MOTORCYCLE
+    THREE_WHEELER
+    VAN
+    TRUCK
+    PICKUP
 }
 
 model Otp {

@@ -11,6 +11,7 @@ import {
 import { FileService } from "@/core/services/files/cloudinary.service";
 import { ApiError } from "@/common/errors/api_error";
 import QueryBuilder from "@/common/utils/queryBuilder";
+import { UserRole } from "@prisma/client";
 
 @Injectable()
 export class ProductService {
@@ -24,6 +25,19 @@ export class ProductService {
         payload: ProductDto,
         files?: Express.Multer.File[],
     ) {
+        await this.prisma.user.findUniqueOrThrow({
+            where: {
+                id: user.id,
+                role: UserRole.PRODUCER,
+                producerProfile: {
+                    verificationStatus: "Accepted",
+                },
+            },
+            select: {
+                id: true,
+            },
+        });
+
         await this.prisma.category.findUniqueOrThrow({
             where: {
                 id: payload.categoryId,

@@ -15,6 +15,7 @@ import { ResponseService } from "@/common/interceptors/response";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
     ChangePasswordDto,
+    CreateDriverProfileDto,
     CreateProducerProfileDto,
     LoginUserDto,
     RefreshTokenDto,
@@ -28,6 +29,7 @@ import { UserPayload } from "@/common/guards/auth.guard";
 import { Roles } from "@/common/decorators/roles.decorator";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
+import { UserRole } from "@prisma/client";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -145,7 +147,7 @@ export class AuthController {
     }
 
     @Post("create-producer-profile")
-    @Roles("PRODUCER")
+    @Roles(UserRole.PRODUCER)
     @UseInterceptors(
         CustomFileInterceptor("tradeLicense"),
         ParseFormDataInterceptor,
@@ -158,6 +160,32 @@ export class AuthController {
     ) {
         const user = req.user as UserPayload;
         const result = await this.authService.createProducerProfile(
+            user,
+            payload,
+            file,
+        );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+
+
+    @Post("create-driver-profile")
+    @Roles(UserRole.DRIVER)
+    @UseInterceptors(
+        CustomFileInterceptor("licenseUrl"),
+        ParseFormDataInterceptor,
+    )
+    @ApiOperation({ summary: "Create Driver Profile" })
+    async createDriverProfile(
+        @Body() payload: CreateDriverProfileDto,
+        @Req() req: Request,
+        @UploadedFile() file?: Express.Multer.File,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.createDriverProfile(
             user,
             payload,
             file,

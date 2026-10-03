@@ -2,7 +2,12 @@ import QueryBuilder from "@/common/utils/queryBuilder";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { UserRole } from "@prisma/client";
-import { AcceptRejectProducerAccountDto, CategoryDto } from "./dto/body.dto";
+import {
+    AcceptRejectProducerAccountDto,
+    CategoryDto,
+    DriverQueryDto,
+    ProducerQueryDto,  
+} from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
 
@@ -11,14 +16,20 @@ export class AdminService {
     constructor(
         private prisma: PrismaService,
         private fileService: FileService,
-    ) { }
+    ) {}
 
-    async getAllProducerFromDB(query) {
+    async getAllProducerFromDB(query: ProducerQueryDto) {
         const queryBuilder = new QueryBuilder(this.prisma.user, query);
 
         const response = queryBuilder
             .search(["email", "fullName", "phone"])
-            .filter()
+            .filter({
+                exacts: ["verificationStatus", "producerType"],
+                nestedFields: {
+                    verificationStatus: "producerProfile.verificationStatus",
+                    producerType: "producerProfile.producerType",
+                },
+            })
             .rawFilter({
                 role: {
                     equals: UserRole.PRODUCER,
@@ -81,14 +92,60 @@ export class AdminService {
         };
     }
 
+    async getAllDriverFromDB(query: DriverQueryDto) {
+        const queryBuilder = new QueryBuilder(this.prisma.user, query);
+
+        const response = queryBuilder
+            .search(["email", "fullName", "phone"])
+            .filter({
+                exacts: ["vehicleType", "verificationStatus"],
+                nestedFields: {
+                    vehicleType: "driverProfile.vehicleType",
+                    verificationStatus: "driverProfile.verificationStatus",
+                },
+            })
+            .rawFilter({
+                role: {
+                    equals: UserRole.DRIVER,
+                },
+            })
+            .sort()
+            .paginate()
+            .select({
+                fullName: true,
+                email: true,
+                profileImage: true,
+                phone: true,
+                driverProfile: {
+                    omit: {
+                        updatedAt: true,
+                        userId: true,
+                    },
+                },
+            });
+
+        const [allDriver, pagination] = await Promise.all([
+            response.execute(),
+            response.countTotal(),
+        ]);
+
+        return {
+            data: {
+                users: allDriver,
+                meta: pagination,
+            },
+            message: "All driver fetched successfully",
+        };
+    }
+
     async createNewCategory(payload: CategoryDto, file?: Express.Multer.File) {
         const existingCategory = await this.prisma.category.findUnique({
             where: {
                 slug: payload.slug,
             },
             select: {
-                slug: true
-            }
+                slug: true,
+            },
         });
 
         if (existingCategory) {
@@ -119,12 +176,12 @@ export class AdminService {
     async toggleCategoryStatus(categoryId: string) {
         const category = await this.prisma.category.findUniqueOrThrow({
             where: {
-                id: categoryId
+                id: categoryId,
             },
             select: {
                 id: true,
-                isActive: true
-            }
+                isActive: true,
+            },
         });
 
         await this.prisma.category.update({
@@ -132,7 +189,7 @@ export class AdminService {
                 id: categoryId,
             },
             data: {
-                isActive: !category.isActive
+                isActive: !category.isActive,
             },
         });
 
