@@ -16,7 +16,7 @@ import { ResponseService } from "@/common/interceptors/response";
 import { Roles } from "@/common/decorators/roles.decorator";
 import { UserRole } from "@prisma/client";
 import {
-    AcceptRejectProducerAccountDto,
+    AcceptRejectAccountDto,
     CategoryDto,
     DriverQueryDto,
     ProducerQueryDto,
@@ -42,12 +42,10 @@ export class AdminController {
         });
     }
 
-    @Patch("accept-reject-producer-account")
+    @Patch("producer-approval")
     @ApiOperation({ summary: "Accept/reject producer account" })
     @Roles(UserRole.ADMIN)
-    async acceptRejectProducerAccount(
-        @Body() payload: AcceptRejectProducerAccountDto,
-    ) {
+    async acceptRejectProducerAccount(@Body() payload: AcceptRejectAccountDto) {
         const result =
             await this.adminService.acceptRejectProducerAccount(payload);
 
@@ -67,6 +65,18 @@ export class AdminController {
             statusCode: HttpStatus.OK,
             message: result.message,
             data: result.data,
+        });
+    }
+
+    @Patch("driver-approval")
+    @ApiOperation({ summary: "Accept/reject driver account" })
+    @Roles(UserRole.ADMIN)
+    async acceptRejectDriverAccount(@Body() payload: AcceptRejectAccountDto) {
+        const result = await this.adminService.acceptRejectDriverAccount(payload);            
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
         });
     }
 

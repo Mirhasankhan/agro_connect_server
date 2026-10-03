@@ -3,7 +3,7 @@ import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { UserRole } from "@prisma/client";
 import {
-    AcceptRejectProducerAccountDto,
+    AcceptRejectAccountDto,   
     CategoryDto,
     DriverQueryDto,
     ProducerQueryDto,  
@@ -64,10 +64,10 @@ export class AdminService {
         };
     }
 
-    async acceptRejectProducerAccount(payload: AcceptRejectProducerAccountDto) {
+    async acceptRejectProducerAccount(payload: AcceptRejectAccountDto) {
         await this.prisma.producerProfile.findUniqueOrThrow({
             where: {
-                userId: payload.producerId,
+                userId: payload.accountId,
                 verificationStatus: "Pending",
             },
         });
@@ -80,7 +80,7 @@ export class AdminService {
         }
 
         await this.prisma.producerProfile.update({
-            where: { userId: payload.producerId },
+            where: { userId: payload.accountId },
             data: {
                 verificationStatus: payload.isAccept ? "Accepted" : "Rejected",
                 rejectionReason: payload.rejectReason,
@@ -135,6 +135,34 @@ export class AdminService {
                 meta: pagination,
             },
             message: "All driver fetched successfully",
+        };
+    }
+
+     async acceptRejectDriverAccount(payload: AcceptRejectAccountDto) {
+        await this.prisma.driverProfile.findUniqueOrThrow({
+            where: {
+                userId: payload.accountId,
+                verificationStatus: "Pending",
+            },
+        });
+
+        if (!payload.isAccept && !payload.rejectReason) {
+            throw new ApiError(
+                HttpStatus.FORBIDDEN,
+                "Reject reason is required",
+            );
+        }
+
+        await this.prisma.driverProfile.update({
+            where: { userId: payload.accountId },
+            data: {
+                verificationStatus: payload.isAccept ? "Accepted" : "Rejected",
+                rejectionReason: payload.isAccept ? null : payload.rejectReason,
+            },
+        });
+
+        return {
+            message: `${payload.isAccept ? "Accepted" : "Rejected"} driver account successfully`,
         };
     }
 

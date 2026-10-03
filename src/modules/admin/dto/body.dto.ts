@@ -11,9 +11,9 @@ import {
     IsEnum,
 } from "class-validator";
 
-export class AcceptRejectProducerAccountDto {
+export class AcceptRejectAccountDto {
     @IsMongoId()
-    producerId: string;
+    accountId: string;
 
     @IsBoolean()
     isAccept: boolean;
