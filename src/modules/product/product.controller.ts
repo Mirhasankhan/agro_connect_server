@@ -5,6 +5,7 @@ import {
     Controller,
     Get,
     HttpStatus,
+    Param,
     Post,
     Put,
     Query,
@@ -65,6 +66,21 @@ export class ProductController {
     async getAllProducts(@Req() req: Request, @Query() query: ProductQueryDto) {
         const user = req.user as UserPayload;
         const result = await this.productService.getAllProducts(user, query);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("details/:id")
+    @Roles(UserRole.BUYER)
+    @OptionalAuth()
+    @ApiOperation({ summary: "Get product details by ID" })
+    async getProductDetails(@Req() req: Request, @Param("id") id: string) {
+        const user = req.user as UserPayload;
+        const result = await this.productService.getProductById(id, user);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,

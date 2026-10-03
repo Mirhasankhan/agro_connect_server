@@ -143,6 +143,47 @@ export class ProductService {
         };
     }
 
+    async getProductById(productId: string, user?: UserPayload) {
+        const product = await this.prisma.product.findUniqueOrThrow({
+            where: {
+                id: productId,
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                sellingUnit: true,
+                pricePerUnit: true,
+                availableQuantity: true,
+                imageUrls: true,
+                avgRating:true,
+                totalReviews:true,                
+                category: {
+                    select: {
+                        name: true                        
+                    },
+                },
+                pricingTiers: {
+                    select: {
+                        pricePerUnit: true,
+                        quantity: true,
+                    },
+                },
+                wishlists: user?.id
+                    ? {
+                          where: { userId: user.id },
+                          select: { id: true },
+                      }
+                    : false,
+            },
+        });
+
+        return {
+            message: "Product fetched successfully",
+            data: product,
+        };
+    }
+
     async addNewPricingTier(user: UserPayload, payload: PricingTierDto) {
         const product = await this.prisma.product.findUniqueOrThrow({
             where: {

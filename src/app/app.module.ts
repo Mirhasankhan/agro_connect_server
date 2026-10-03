@@ -43,10 +43,11 @@ import { OrderModule } from "@/modules/order/order.module";
                 },
             ],
         }),
+          ProductModule,
         AdminModule,
         AuthModule,
         OrderModule,
-        ProductModule,
+      
         ShoppingModule,
         ShippingAddressModule,
         CommonModule,
