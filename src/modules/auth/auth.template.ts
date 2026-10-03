@@ -162,3 +162,27 @@ export const emailBody = (username: string, otp: string) => {
   `;
     return html;
 };
+
+export const emailBodyForDeliveryCompletion = (orderId: string, otp: string) =>
+    baseEmailTemplate(
+        "Delivery Completion Verification",
+        `
+        <p style="font-size:15px;color:#64748b;margin-bottom:24px;">
+            Use the OTP below to confirm delivery for order
+            <strong style="color:#334155;">${orderId}</strong>.
+        </p>
+
+        <div style="display:inline-block;padding:16px 40px;background:#2563eb;color:#ffffff;
+                    font-size:26px;font-weight:700;letter-spacing:4px;border-radius:8px;">
+            ${otp}
+        </div>
+
+        <p style="font-size:13px;color:#64748b;margin-top:24px;">
+            Share this code with the delivery agent only when your order has been delivered.
+        </p>
+
+        <p style="font-size:13px;color:#64748b;margin-top:12px;">
+            If you did not receive this delivery, please contact support.
+        </p>
+        `,
+    );

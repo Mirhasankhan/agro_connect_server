@@ -4,6 +4,7 @@ import {
     IsOptional,
     IsString,
     IsEnum,
+    IsIn,
 } from "class-validator";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 
@@ -27,7 +28,7 @@ export class OrderQueryDto {
     @IsOptional()
     @IsEnum(PaymentStatus)
     paymentStatus?: PaymentStatus;
-    
+
     @IsOptional()
     @IsString()
     page?: string;
@@ -35,4 +36,19 @@ export class OrderQueryDto {
     @IsOptional()
     @IsString()
     limit?: string;
+}
+
+export class DeliveryDto {
+    @IsMongoId()
+    deliveryId: string;
+
+    @IsIn(["PickedUp", "Cancelled"])
+    status: "PickedUp" | "Cancelled";
+}
+export class ConfirmDeliveryDto {
+    @IsMongoId()
+    deliveryId: string;
+
+    @IsString()
+    otp: string;
 }

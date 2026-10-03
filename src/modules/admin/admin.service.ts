@@ -1,12 +1,13 @@
 import QueryBuilder from "@/common/utils/queryBuilder";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { BadRequestException, HttpStatus, Injectable } from "@nestjs/common";
 import { UserRole } from "@prisma/client";
 import {
-    AcceptRejectAccountDto,   
+    AcceptRejectAccountDto,
     CategoryDto,
     DriverQueryDto,
-    ProducerQueryDto,  
+    ProducerQueryDto,
+    AssignDriverDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
@@ -138,7 +139,7 @@ export class AdminService {
         };
     }
 
-     async acceptRejectDriverAccount(payload: AcceptRejectAccountDto) {
+    async acceptRejectDriverAccount(payload: AcceptRejectAccountDto) {
         await this.prisma.driverProfile.findUniqueOrThrow({
             where: {
                 userId: payload.accountId,
@@ -225,4 +226,94 @@ export class AdminService {
             message: `Category ${category.isActive ? "Deactived" : "Actived"} successfully`,
         };
     }
+
+    async assignDriverToDelivery(payload: AssignDriverDto) {
+        const [order, driver] = await Promise.all([
+            this.prisma.order.findUnique({
+                where: {
+                    id: payload.orderId,
+                    status: "Active",
+                    paymentStatus: "Paid",
+                },
+                select: {
+                    deliveries: {
+                        select: {
+                            id: true,
+                            status: true,
+                        },
+                    },
+                },
+            }),
+            this.prisma.user.findUnique({
+                where: {
+                    id: payload.driverId,
+                    role: UserRole.DRIVER,
+                },
+                select: {
+                    id: true,
+                    driverProfile: {
+                        select: {
+                            verificationStatus: true,
+                            isAvailable: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+
+        if (!order) {
+            throw new ApiError(
+                HttpStatus.NOT_FOUND,
+                "Order not found or not eligible for delivery",
+            );
+        }
+
+        if (order.deliveries.length > 0) {
+            throw new ApiError(
+                HttpStatus.CONFLICT,
+                "Driver already assigned to this order",
+            );
+        }
+
+        if (!driver) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "Driver not found");
+        }
+
+        if (driver.driverProfile.verificationStatus !== "Accepted") {
+            throw new ApiError(HttpStatus.FORBIDDEN, "Driver is not verified");
+        }
+
+        if (!driver.driverProfile.isAvailable) {
+            throw new ApiError(HttpStatus.FORBIDDEN, "Driver is not available");
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+            const driver = await tx.driverProfile.updateMany({
+                where: {
+                    userId: payload.driverId,
+                },
+                data: {
+                    isAvailable: false,
+                },
+            });
+
+            if (driver.count === 0) {
+                throw new BadRequestException("Driver is no longer available");
+            }
+
+            await tx.delivery.create({
+                data: {
+                    orderId: payload.orderId,
+                    driverId: payload.driverId,
+                },
+            });
+        });
+
+        return {
+            message: "Driver assigned to delivery successfully",
+        };
+    }
+
+
+    
 }

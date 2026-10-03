@@ -20,9 +20,11 @@ import {
     CategoryDto,
     DriverQueryDto,
     ProducerQueryDto,
+    AssignDriverDto,
 } from "./dto/body.dto";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
+import { IsPublic } from "@/common/decorators/auth.decorator";
 
 @ApiTags("Admin")
 @Controller("admin")
@@ -104,6 +106,19 @@ export class AdminController {
     @Roles(UserRole.ADMIN)
     async toggleCategoryStatus(@Param("id") id: string) {
         const result = await this.adminService.toggleCategoryStatus(id);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+
+    @IsPublic()
+    @Post("assign-driver")
+    @ApiOperation({ summary: "Assign driver to delivery" })
+    @Roles(UserRole.ADMIN)
+    async assignDriverToDelivery(@Body() payload: AssignDriverDto) {
+        const result = await this.adminService.assignDriverToDelivery(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,

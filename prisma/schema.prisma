@@ -30,6 +30,9 @@ model User {
     wishlists         Wishlist[]
     orders            Order[]
     driverProfile     DriverProfile?
+    deliveries        Delivery[]
+    producerEarnings  ProducerEarning[]
+    driverEarnings    DriverEarning[]
 
     @@map("users")
 }
@@ -76,6 +79,24 @@ model ProducerProfile {
     updatedAt DateTime @updatedAt
 }
 
+model ProducerEarning {
+    id               String    @id @default(auto()) @map("_id") @db.ObjectId
+    producerId       String    @db.ObjectId
+    orderItemId      String    @db.ObjectId
+    amount           Float
+    isTransferred    Boolean   @default(false)
+    stripeTransferId String?
+    paidAt           DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    producer  User      @relation(fields: [producerId], references: [id])
+    orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+
+    @@unique([orderItemId])
+}
+
 model DriverProfile {
     id          String   @id @default(auto()) @map("_id") @db.ObjectId
     userId      String   @unique @db.ObjectId
@@ -105,6 +126,22 @@ model DriverProfile {
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+}
+
+model DriverEarning {
+    id               String    @id @default(auto()) @map("_id") @db.ObjectId
+    driverId         String    @db.ObjectId
+    orderId          String    @unique @db.ObjectId
+    amount           Int
+    isTransferred    Boolean   @default(false)
+    stripeTransferId String?
+    paidAt           DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    driver User  @relation(fields: [driverId], references: [id])
+    order  Order @relation(fields: [orderId], references: [id])
 }
 
 enum ProducerType {
@@ -255,8 +292,10 @@ model Order {
 
     items OrderItem[]
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @updatedAt
+    deliveries    Delivery[]
+    driverEarning DriverEarning?
 
     @@map("orders")
 }
@@ -280,10 +319,29 @@ model OrderItem {
     order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
     product Product @relation(fields: [productId], references: [id], onDelete: NoAction)
 
+    createdAt       DateTime         @default(now())
+    updatedAt       DateTime         @updatedAt
+    producerEarning ProducerEarning?
+
+    @@map("orderItems")
+}
+
+model Delivery {
+    id        String         @id @default(auto()) @map("_id") @db.ObjectId
+    orderId   String         @unique @db.ObjectId
+    driverId  String         @db.ObjectId
+    status    DeliveryStatus @default(Assigned)
+    otpHash   String?
+    latitude  Float?
+    longitude Float?
+
+    order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    driver User  @relation(fields: [driverId], references: [id])
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    @@map("orderItems")
+    @@map("deliveries")
 }
 
 enum OrderStatus {
@@ -302,6 +360,12 @@ enum ItemStatus {
     Delivered
     Cancelled
     Refunded
+}
+
+enum DeliveryStatus {
+    Assigned
+    PickedUp
+    Delivered
 }
 
 enum PaymentStatus {

@@ -67,3 +67,11 @@ export class DriverQueryDto extends BaseUserQueryDto {
     @IsEnum(DriverVehicleType)
     vehicleType?: DriverVehicleType;
 }
+
+export class AssignDriverDto {
+    @IsMongoId()
+    orderId: string;
+
+    @IsMongoId()
+    driverId: string;
+}

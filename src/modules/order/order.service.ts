@@ -2,15 +2,26 @@ import { UserPayload } from "@/common/guards/auth.guard";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { StripeService } from "@/core/services/stripe/stripe.service";
 import { HttpStatus, Injectable } from "@nestjs/common";
-import { CreateOrderDto, OrderQueryDto } from "./dto/body.dto";
+import {
+    ConfirmDeliveryDto,
+    CreateOrderDto,
+    DeliveryDto,
+    OrderQueryDto,
+} from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import Stripe from "stripe";
 import QueryBuilder from "@/common/utils/queryBuilder";
+import { BcryptService } from "@/common/utils/bcrypt.service";
+import config from "@/config";
+import { generateOrderId, generateOTP } from "../auth/auth.utils";
+import { emailBodyForDeliveryCompletion } from "../auth/auth.template";
+import sendEmail from "@/core/services/email";
 
 @Injectable()
 export class OrderService {
     constructor(
         private prisma: PrismaService,
+        private bcryptService: BcryptService,
         private stripe: StripeService,
     ) {}
 
@@ -89,7 +100,7 @@ export class OrderService {
         }
 
         const items = carts.map((cart) => {
-            const basePrice = cart.product.pricePerUnit as number;       
+            const basePrice = cart.product.pricePerUnit as number;
             const applicableTier = cart.product.pricingTiers
                 .filter((tier) => tier.quantity <= cart.quantity)
                 .sort((a, b) => b.quantity - a.quantity)[0];
@@ -113,13 +124,7 @@ export class OrderService {
         const totalAmount =
             Math.round(
                 items.reduce((total, item) => total + item.subtotal, 0) * 100,
-            ) / 100;
-
-        const generateOrderId = () => {
-            const code = Math.floor(100000 + Math.random() * 900000);
-
-            return `AC-${code}`;
-        };
+            ) / 100;    
 
         const orderId = generateOrderId();
 
@@ -473,6 +478,204 @@ export class OrderService {
         return {
             message: "Order fetched successfully",
             data: order,
+        };
+    }
+
+    async markDeliveryAsPickedUpOrCanceled(
+        payload: DeliveryDto,
+        user: UserPayload,
+    ) {
+        await this.prisma.delivery.findUniqueOrThrow({
+            where: {
+                id: payload.deliveryId,
+                driverId: user.id,
+                status: "Assigned",
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (payload.status === "PickedUp") {
+            await this.prisma.delivery.update({
+                where: {
+                    id: payload.deliveryId,
+                },
+                data: {
+                    status: "PickedUp",
+                },
+            });
+
+            return {
+                message: "Delivery marked as picked up successfully",
+            };
+        } else if (payload.status === "Cancelled") {
+            await this.prisma.delivery.delete({
+                where: {
+                    id: payload.deliveryId,
+                },
+            });
+
+            return {
+                message: "Delivery cancelled successfully",
+            };
+        }
+    }
+
+    async sendDeliveryCompletionOtp(deliveryId: string, user: UserPayload) {
+        const delivery = await this.prisma.delivery.findUniqueOrThrow({
+            where: {
+                id: deliveryId,
+                driverId: user.id,
+                status: "PickedUp",
+            },
+            select: {
+                id: true,
+                order: {
+                    select: {
+                        orderId: true,
+                        customer: {
+                            select: {
+                                email: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const { otp } = generateOTP();
+
+        const hashedOtp: string = await this.bcryptService.hash(
+            otp,
+            config.password.salt,
+        );
+
+        const html = emailBodyForDeliveryCompletion(
+            delivery.order.orderId,
+            otp,
+        );
+        await sendEmail(
+            delivery.order.customer.email,
+            `Your OTP for Delivery Completion - Order ${delivery.order.orderId}`,
+            html,
+        );
+
+        await this.prisma.delivery.update({
+            where: {
+                id: deliveryId,
+            },
+            data: {
+                otpHash: hashedOtp,
+            },
+        });
+
+        return {
+            message: "OTP sent to customer successfully",
+        };
+    }
+
+    async verifyDeliveryCompletionOtp(
+        payload: ConfirmDeliveryDto,
+        user: UserPayload,
+    ) {
+        const delivery = await this.prisma.delivery.findUniqueOrThrow({
+            where: {
+                id: payload.deliveryId,
+                driverId: user.id,
+                status: "PickedUp",
+            },
+            select: {
+                id: true,
+                otpHash: true,
+                order: {
+                    select: {
+                        id: true,
+                        status: true,
+                        paymentStatus: true,
+                        items: {
+                            select: {
+                                id: true,
+                                subtotal: true,
+                                product: {
+                                    select: {
+                                        producerId: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const otpMatched = await this.bcryptService.compare(
+            payload.otp,
+            delivery.otpHash as string,
+        );
+
+        if (!otpMatched) {
+            throw new ApiError(HttpStatus.FORBIDDEN, "Incorrect OTP");
+        }
+
+        await this.prisma.$transaction(async (transaction) => {
+            await transaction.delivery.update({
+                where: {
+                    id: payload.deliveryId,
+                },
+                data: {
+                    status: "Delivered",
+                },
+            });
+
+            await transaction.driverProfile.update({
+                where: {
+                    userId: user.id,
+                },
+                data: {
+                    isAvailable: true,
+                },
+            });
+
+            await transaction.order.update({
+                where: {
+                    id: delivery.order.id,
+                    status: "Active",
+                },
+                data: {
+                    status: "Delivered",
+                },
+            });
+
+            for (const item of delivery.order.items) {
+                await transaction.orderItem.update({
+                    where: {
+                        id: item.id,
+                    },
+                    data: {
+                        status: "Delivered",
+                    },
+                });
+                await transaction.producerEarning.create({
+                    data: {
+                        producerId: item.product.producerId,
+                        orderItemId: item.id,
+                        amount: item.subtotal * 0.9, // Assuming 10% platform fee
+                    },
+                });
+            }
+
+            await transaction.driverEarning.create({
+                data: {
+                    driverId: user.id,
+                    orderId: delivery.order.id,
+                    amount: 50,
+                },
+            });
+        });
+
+        return {
+            message: "Delivery marked as completed successfully",
         };
     }
 
