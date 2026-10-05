@@ -7,6 +7,7 @@ import {
     IsEnum,
     IsNotEmpty,
     IsDateString,
+    IsPhoneNumber,
 } from "class-validator";
 import { UserRole, ProducerType, DriverVehicleType } from "@prisma/client";
 
@@ -34,6 +35,16 @@ export class VerifyRegistrationDto {
     @IsOptional()
     @IsString()
     fcmToken?: string;
+}
+
+export class updateUserDto {
+    @IsOptional()
+    @IsString()
+    fullName?: string;
+
+    @IsOptional()
+    @IsPhoneNumber()
+    phone?: string;
 }
 
 export class LoginUserDto {

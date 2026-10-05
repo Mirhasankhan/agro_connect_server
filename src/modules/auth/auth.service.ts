@@ -15,6 +15,7 @@ import {
     RegisterUserDto,
     ResendOtpDto,
     ResetPasswordDto,
+    updateUserDto,
     VerifyOtpDto,
     VerifyRegistrationDto,
 } from "./dto/body.dto";
@@ -64,7 +65,7 @@ export class AuthService {
             update: {
                 otpHash: hashedOtp,
                 expiresAt: new Date(otpExpiry),
-                fullName: payload.fullName,               
+                fullName: payload.fullName,
                 role: payload.role,
                 password: hashedPassword,
             },
@@ -128,7 +129,7 @@ export class AuthService {
                 data: {
                     email: userData.email,
                     password: userData.password,
-                    fullName: userData.fullName,                 
+                    fullName: userData.fullName,
                     role: userData.role,
                     fcmToken: payload.fcmToken,
                 },
@@ -503,9 +504,7 @@ export class AuthService {
         try {
             if (tradeLicenseFile) {
                 tradeLicenseUrl =
-                    await this.fileService.uploadToCloudinary(
-                        tradeLicenseFile,
-                    );
+                    await this.fileService.uploadToCloudinary(tradeLicenseFile);
             }
 
             if (nidFile) {
@@ -538,6 +537,15 @@ export class AuthService {
                 tradeLicense: tradeLicenseUrl,
                 nidUrl,
                 ...payload,
+            },
+        });
+
+        await this.prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                isSetupCompleted: true,
             },
         });
 
@@ -588,8 +596,56 @@ export class AuthService {
             },
         });
 
+        await this.prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                isSetupCompleted: true,
+            },
+        });
+
         return {
-            message: "Driver profile created successfully",
+            message: "Profile updated successfully",
+        };
+    }
+
+    async updateProfile(
+        user: UserPayload,
+        payload: updateUserDto,
+        file?: Express.Multer.File,
+    ) {
+        const userData = await this.prisma.user.findUniqueOrThrow({
+            where: {
+                id: user.id,
+            },
+            select: {
+                id: true,
+                fullName: true,
+                phone: true,
+                profileImage: true,
+            },
+        });
+
+        let profileImage = null;
+
+        if (file) {
+            profileImage = await this.fileService.uploadToCloudinary(file);
+        }
+
+        await this.prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                fullName: payload.fullName ?? userData.fullName,
+                phone: payload.phone ?? userData.phone,
+                profileImage: profileImage ?? userData.profileImage,
+            },
+        });
+
+        return {
+            message: "Profile updated successfully",
         };
     }
 }

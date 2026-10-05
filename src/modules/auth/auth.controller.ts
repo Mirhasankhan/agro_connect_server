@@ -4,6 +4,7 @@ import {
     HttpCode,
     HttpStatus,
     Post,
+    Put,
     Req,
     UploadedFile,
     UploadedFiles,
@@ -23,6 +24,7 @@ import {
     RegisterUserDto,
     ResetPasswordDto,
     SendForgotPasswordOtpDto,
+    updateUserDto,
     VerifyForgotPasswordOtpDto,
     VerifyRegistrationDto,
 } from "./dto/body.dto";
@@ -38,7 +40,7 @@ import { UserRole } from "@prisma/client";
 @ApiTags("Auth")
 @Controller("auth")
 export class AuthController {
-    constructor(private authService: AuthService) { }
+    constructor(private authService: AuthService) {}
 
     @HttpCode(HttpStatus.CREATED)
     @IsPublic()
@@ -182,7 +184,6 @@ export class AuthController {
         });
     }
 
-
     @Post("create-driver-profile")
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
@@ -197,6 +198,31 @@ export class AuthController {
     ) {
         const user = req.user as UserPayload;
         const result = await this.authService.createDriverProfile(
+            user,
+            payload,
+            file,
+        );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+
+    @Put("update-profile")
+    @Roles(UserRole.DRIVER, UserRole.PRODUCER, UserRole.BUYER)
+    @UseInterceptors(
+        CustomFileInterceptor("profileImage"),
+        ParseFormDataInterceptor,
+    )
+    @ApiOperation({ summary: "Update user Profile" })
+    async updateUserProfile(
+        @Body() payload: updateUserDto,
+        @Req() req: Request,
+        @UploadedFile() file?: Express.Multer.File,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.updateProfile(
             user,
             payload,
             file,

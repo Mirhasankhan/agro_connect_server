@@ -43,10 +43,9 @@ import { OrderModule } from "@/modules/order/order.module";
                 },
             ],
         }),
-
+        AuthModule,
         AdminModule,
         OrderModule,
-        AuthModule,
         ProductModule,
         ShoppingModule,
         ShippingAddressModule,
