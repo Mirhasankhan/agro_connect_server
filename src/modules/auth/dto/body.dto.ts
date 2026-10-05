@@ -113,6 +113,8 @@ export class CreateProducerProfileDto {
 
     @IsString()
     district: string;
+    @IsString()
+    region: string;
 
     @IsArray()
     @IsString({ each: true })
@@ -120,45 +122,45 @@ export class CreateProducerProfileDto {
 
     @IsOptional()
     @IsString()
-    nidNumber?: string;  
+    nidNumber?: string;
 
     @IsOptional()
     @IsString()
     tinNumber?: string;
 }
 
-export class CreateDriverProfileDto { 
-  @IsString()
-  @IsNotEmpty()
-  nidNumber: string;
+export class CreateDriverProfileDto {
+    @IsString()
+    @IsNotEmpty()
+    nidNumber: string;
 
-  @IsDateString()
-  dateOfBirth: string;
+    @IsDateString()
+    dateOfBirth: string;
 
-  @IsString()
-  @IsNotEmpty()
-  drivingLicenseNumber: string;
+    @IsString()
+    @IsNotEmpty()
+    drivingLicenseNumber: string;
 
-  @IsEnum(DriverVehicleType)
-  vehicleType: DriverVehicleType;
+    @IsEnum(DriverVehicleType)
+    vehicleType: DriverVehicleType;
 
-  @IsString()
-  @IsNotEmpty()
-  vehicleRegistration: string;
+    @IsString()
+    @IsNotEmpty()
+    vehicleRegistration: string;
 
-  @IsString()
-  @IsNotEmpty()
-  vehicleModel: string;
+    @IsString()
+    @IsNotEmpty()
+    vehicleModel: string;
 
-  @IsString()
-  @IsNotEmpty()
-  vehicleColor: string;
+    @IsString()
+    @IsNotEmpty()
+    vehicleColor: string;
 
-  @IsOptional()
-  @IsString()
-  address?: string;
+    @IsOptional()
+    @IsString()
+    address?: string;
 
-  @IsString()
-  @IsNotEmpty()
-  district: string;
+    @IsString()
+    @IsNotEmpty()
+    district: string;
 }

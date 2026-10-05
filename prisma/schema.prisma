@@ -62,12 +62,14 @@ model ProducerProfile {
     // Location
     address  String
     district String
+    region   String
 
     // Production information
     productionTypes String[]
 
     // Verification documents
     nidNumber    String?
+    nidUrl       String?
     tradeLicense String?
     tinNumber    String?
 

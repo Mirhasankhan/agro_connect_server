@@ -421,7 +421,7 @@ A root health endpoint is available at `GET /`:
 {
     "success": true,
     "message": "El Psy Congroo!",
-    "server_name": "nestjs_starter_pack",
+    "server_name": "Agro Connect Server",
     "server_type": "WEB"
 }
 ```

@@ -12,7 +12,7 @@ import { getLocalIP } from "./common/utils/localIp";
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
         logger: new ConsoleLogger({
-            prefix: "nestjs_starter_pack",
+            prefix: "argo-connect",
             logLevels: ["error", "warn", "fatal"],
             timestamp: true,
             json: true,
@@ -42,7 +42,7 @@ async function bootstrap() {
         res.send({
             success: true,
             message: "El Psy Congroo!",
-            server_name: "nestjs_starter_pack",
+            server_name: "argo_connect",
             server_type: "WEB",
         });
     });
