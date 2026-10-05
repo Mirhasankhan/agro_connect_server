@@ -1,175 +1,332 @@
-// import { PrismaService } from '@/core/services/prisma/prisma.service';
-// import { ConfigService } from '@nestjs/config';
-// import { JwtService } from '@nestjs/jwt';
-// import {
-//   ConnectedSocket,
-//   MessageBody,
-//   OnGatewayConnection,
-//   OnGatewayDisconnect,
-//   OnGatewayInit,
-//   SubscribeMessage,
-//   WebSocketGateway,
-//   WebSocketServer,
-// } from '@nestjs/websockets';
-// import { Server, Socket } from 'socket.io';
+import { PrismaService } from "@/core/services/prisma/prisma.service";
+import { Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import {
+    ConnectedSocket,
+    MessageBody,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    SubscribeMessage,
+    WebSocketGateway,
+    WebSocketServer,
+} from "@nestjs/websockets";
+import { UserRole } from "@prisma/client";
+import { Server, Socket } from "socket.io";
+import config from "@/config";
+import { SocketPresenceService } from "./socket.presence.service";
 
-// interface OnlineUser {
-//   userId: string;
-//   socketId: string;
-//   lastSeen: Date;
-// }
+type SubscribePayload = {
+    userId: string;
+};
 
-// @WebSocketGateway({
-//   cors: { origin: '*', methods: ['GET', 'POST'] },
-//   perMessageDeflate: false,
-// })
-// export class WebsocketGateway
-//   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-// {
-//   @WebSocketServer()
-//   server: Server;
+type MessagePayload = {
+    receiverId: string;
+    message: string;
+    images?: string[];
+};
 
-//   private onlineUsers = new Map<string, OnlineUser>();
+@WebSocketGateway({
+    cors: { origin: "*", methods: ["GET", "POST"] },
+    perMessageDeflate: false,
+})
+export class WebsocketGateway
+    implements OnGatewayConnection, OnGatewayDisconnect
+{
+    @WebSocketServer()
+    server: Server;
 
-//   constructor(
-//     private readonly prisma: PrismaService,
-//     private readonly config: ConfigService,
-//     private readonly jwtService: JwtService,
-//   ) {}
+    private readonly logger = new Logger(WebsocketGateway.name);
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly configService: ConfigService,
+        private readonly jwtService: JwtService,
+        private readonly presence: SocketPresenceService,
+    ) {}
 
-//   afterInit() {
-//     console.log('Socket.IO server initialized');
-//   }
+   
+    async handleConnection(socket: Socket) {
+        try {
+            const token = this.extractToken(socket);
+            if (!token) throw new Error("No token provided");
 
-//   async handleConnection(socket: Socket) {
-//     try {
-//       const token =  socket.handshake.auth.token;
-//       if (!token) throw new Error('No token provided');
+            const payload = await this.jwtService.verifyAsync(token, {
+                secret:
+                    this.configService.get<string>("JWT_SECRET") ||
+                    config.jwt.jwt_secret,
+            });
 
-//       const payload = await this.jwtService.verifyAsync(token.toString());
-//       const userId = payload.id;
+            // Support the most common JWT id claim names
+            const userId = (payload.id ?? payload.userId ?? payload.sub) as
+                | string
+                | undefined;
+            if (!userId) throw new Error("Token has no user id claim");
 
-//       socket.data.userId = userId;
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { id: true, deleted: true },
+            });
 
-//       this.onlineUsers.set(userId, {
-//         userId,
-//         socketId: socket.id,
-//         lastSeen: new Date(),
-//       });
+            if (!user || user.deleted) throw new Error("Invalid user");
 
-//       socket.emit('authenticated', { userId, message: 'Authenticated' });
-//       console.log(`User connected: ${userId} (${socket.id})`);
-//     } catch (err) {
-//       console.error('Auth failed:', err.message);
-//       socket.disconnect(true);
-//     }
-//   }
+            socket.data.userId = userId;
+            this.presence.add(userId, socket.id);
 
-//   handleDisconnect(socket: Socket) {
-//     const userId = socket.data.userId;
-//     if (userId) {
-//       this.onlineUsers.delete(userId);
-//       console.log(`User disconnected: ${userId} (${socket.id})`);
-//     }
-//   }
+            socket.emit("authenticated", { userId, message: "Authenticated" });
+        } catch (err) {
+            this.logger.warn(
+                `Socket ${socket.id} auth failed: ${(err as Error).message}`,
+            );
+            this.emitError(socket, "Authentication failed");
+            socket.disconnect(true);
+        }
+    }
 
-//   @SubscribeMessage('sendMessage')
-//   async handleSendMessage(
-//     @MessageBody()
-//     payload: { receiverId: string; message: string; images?: string[] },
-//     @ConnectedSocket() socket: Socket,
-//   ) {
-//     const senderId = socket.data.userId;
-//     if (!senderId) return;
+    handleDisconnect(socket: Socket) {
+        const userId = socket.data.userId as string | undefined;
+        if (!userId) return;
 
-//     const { receiverId, message, images = [] } = payload;
+        this.presence.remove(userId, socket.id);
+    }
 
-//     const receiverExists = await this.prisma.user.findUnique({
-//       where: { id: receiverId },
-//       select: { id: true, username: true, avatar: true, role: true, email: true, contactNo: true },
-//     });
+  
+    @SubscribeMessage("subscribe")
+    async subscribe(
+        @MessageBody() rawPayload: unknown,
+        @ConnectedSocket() socket: Socket,
+    ) {
+        try {
+            const userId = socket.data.userId as string | undefined;
+            if (!userId) {
+                return this.emitError(socket, "Not authenticated");
+            }
 
-//     const senderExists = await this.prisma.user.findUnique({
-//       where: { id: senderId },
-//       select: { id: true, username: true, avatar: true, role: true, email: true, contactNo: true },
-//     });
+            const payload = this.parsePayload<SubscribePayload>(rawPayload);
+            if (!payload.userId || userId === payload.userId) {
+                return this.emitError(
+                    socket,
+                    "A valid conversation user is required",
+                );
+            }
 
-//     if (!receiverExists) {
-//       socket.emit('error', { message: 'Receiver not found' });
-//       return;
-//     }
+            const conversation = await this.getOrCreateConversation(
+                userId,
+                payload.userId,
+            );
+            const room = this.roomName(conversation.id);
+            await socket.join(room);
 
-//     // Save the message
-//     await this.prisma.chat.create({
-//       data: { senderId, receiverId, message, images },
-//     });
+            await this.prisma.chatMessage.updateMany({
+                where: {
+                    conversationId: conversation.id,
+                    receiverId: userId,
+                    isRead: false,
+                },
+                data: { isRead: true },
+            });
 
-//     // Send to receiver if online
-//     const receiverOnline = this.onlineUsers.get(receiverId);
-//     if (receiverOnline) {
-//       this.server.to(receiverOnline.socketId).emit('message', {
-//         user: senderExists,
-//         message,
-//         images,
-//       });
-//     }
+            const messages = await this.prisma.chatMessage.findMany({
+                where: { conversationId: conversation.id },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    message: true,
+                    images: true,
+                    isRead: true,
+                    createdAt: true,
+                    senderId: true,
+                },
+            });
 
-//     // Send confirmation to sender
-//     socket.emit('message', {
-//       userId: senderId,
-//       message,
-//       images,
-//       delivered: !!receiverOnline,
-//     });
-//   }
+            const participant = await this.prisma.user.findUnique({
+                where: { id: payload.userId },
+                select: {
+                    id: true,
+                    fullName: true,
+                    role: true,
+                    profileImage: true,
+                },
+            });
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { participantA, participantB, ...conversationDetails } =
+                conversation;
 
-//   @SubscribeMessage('typing')
-//   handleTyping(
-//     @MessageBody() payload: { receiverId: string },
-//     @ConnectedSocket() socket: Socket,
-//   ) {
-//     const { receiverId } = payload;
-//     const senderId = socket.data.userId;
-//     if (!senderId || !receiverId) return;
+            socket.emit("conversationHistory", {
+                conversation: {
+                    ...conversationDetails,
+                    participant: participant
+                        ? {
+                              ...participant,
+                              isOnline: this.presence.isOnline(
+                                  participant.id,
+                              ),
+                          }
+                        : null,
+                },
+                messages: messages.map(({ senderId, ...message }) => ({
+                    ...message,
+                    isSendByMe: senderId === userId,
+                })),
+            });
+        } catch (err) {
+            this.handleError(socket, err, "subscribe");
+        }
+    }
 
-//     const receiverOnline = this.onlineUsers.get(receiverId);
-//     if (receiverOnline) {
-//       this.server.to(receiverOnline.socketId).emit('userTyping', { userId: senderId });
-//     }
-//   }
+    @SubscribeMessage("sendMessage")
+    async sendMessage(
+        @MessageBody() rawPayload: unknown,
+        @ConnectedSocket() socket: Socket,
+    ) {
+        try {
+            const senderId = socket.data.userId as string | undefined;
+            if (!senderId) {
+                return this.emitError(socket, "Not authenticated");
+            }
 
-//   @SubscribeMessage('stopTyping')
-//   handleStopTyping(
-//     @MessageBody() payload: { receiverId: string },
-//     @ConnectedSocket() socket: Socket,
-//   ) {
-//     const { receiverId } = payload;
-//     const senderId = socket.data.userId;
-//     if (!senderId || !receiverId) return;
+            const payload = this.parsePayload<MessagePayload>(rawPayload);
+            if (!payload.receiverId || !payload.message?.trim()) {
+                return this.emitError(socket, "Receiver and message are required");
+            }
 
-//     const receiverOnline = this.onlineUsers.get(receiverId);
-//     if (receiverOnline) {
-//       this.server.to(receiverOnline.socketId).emit('userStoppedTyping', { userId: senderId });
-//     }
-//   }
+            const conversation = await this.getOrCreateConversation(
+                senderId,
+                payload.receiverId,
+            );
+            const room = this.roomName(conversation.id);
+            if (!socket.rooms.has(room)) {
+                return this.emitError(socket, "Subscribe to the conversation first");
+            }
 
-//   @SubscribeMessage('getOnlineUsers')
-//   async handleGetOnlineUsers(@ConnectedSocket() socket: Socket) {
-//     try {
-//       const userIds = Array.from(this.onlineUsers.keys());
-//       const users = await this.prisma.user.findMany({
-//         where: { id: { in: userIds } },
-//         select: { id: true, username: true, avatar: true },
-//       });
+            const savedMessage = await this.prisma.chatMessage.create({
+                data: {
+                    conversationId: conversation.id,
+                    senderId,
+                    receiverId: payload.receiverId,
+                    message: payload.message.trim(),
+                    images: Array.isArray(payload.images) ? payload.images : [],
+                },
+            });
 
-//       socket.emit('onlineUsers', users.map((u) => ({
-//         ...u,
-//         lastSeen: this.onlineUsers.get(u.id)?.lastSeen,
-//         isOnline: true,
-//       })));
-//     } catch (error) {
-//       console.error('Get online users error:', error);
-//       socket.emit('error', { message: 'Failed to get online users' });
-//     }
-//   }
-// }
+            await this.prisma.conversation.update({
+                where: { id: conversation.id },
+                data: { updatedAt: new Date() },
+            });
+
+            const sockets = await this.server.in(room).fetchSockets();
+            for (const targetSocket of sockets) {
+                const { senderId, ...message } = savedMessage;
+                targetSocket.emit("message", {
+                    ...message,
+                    isSendByMe: senderId === targetSocket.data.userId,
+                });
+            }
+        } catch (err) {
+            this.handleError(socket, err, "sendMessage");
+        }
+    }
+
+
+    private extractToken(socket: Socket): string | null {
+        const { auth, query, headers } = socket.handshake;
+
+        const raw =
+            auth?.token ??
+            query?.token ??
+            headers?.token ??
+            headers?.authorization;
+
+        const value = Array.isArray(raw) ? raw[0] : raw;
+        if (!value) return null;
+
+        const token = String(value)
+            .trim()
+            .replace(/^Bearer\s+/i, "");
+        return token || null;
+    }
+
+   
+    private parsePayload<T>(payload: unknown): Partial<T> {
+        if (typeof payload === "string") {
+            try {
+                const parsed = JSON.parse(payload);
+                return parsed && typeof parsed === "object"
+                    ? (parsed as Partial<T>)
+                    : {};
+            } catch {
+                return {};
+            }
+        }
+        return payload && typeof payload === "object"
+            ? (payload as Partial<T>)
+            : {};
+    }
+
+    private async getOrCreateConversation(userId: string, otherUserId: string) {
+        const [participantA, participantB] = [userId, otherUserId].sort();
+
+        const [otherUser, currentUser] = await Promise.all([
+            this.prisma.user.findUnique({
+                where: { id: otherUserId },
+                select: { id: true, role: true, deleted: true },
+            }),
+            this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { role: true },
+            }),
+        ]);
+
+        if (
+            !otherUser ||
+            otherUser.deleted ||
+            !this.isAllowedConversation(otherUser.role)
+        ) {
+            throw new Error("User is not available for messaging");
+        }
+
+        if (
+            !currentUser ||
+            !this.isAllowedConversationPair(currentUser.role, otherUser.role)
+        ) {
+            throw new Error(
+                "Only buyer-producer and buyer-driver conversations are allowed",
+            );
+        }
+
+        return this.prisma.conversation.upsert({
+            where: { participantA_participantB: { participantA, participantB } },
+            create: { participantA, participantB },
+            update: {},
+        });
+    }
+
+    private isAllowedConversation(role: UserRole) {
+        return (
+            role === UserRole.BUYER ||
+            role === UserRole.PRODUCER ||
+            role === UserRole.DRIVER
+        );
+    }
+
+    private isAllowedConversationPair(first: UserRole, second: UserRole) {
+        return (
+            (first === UserRole.BUYER &&
+                (second === UserRole.PRODUCER || second === UserRole.DRIVER)) ||
+            (second === UserRole.BUYER &&
+                (first === UserRole.PRODUCER || first === UserRole.DRIVER))
+        );
+    }
+
+    private roomName(conversationId: string) {
+        return `conversation:${conversationId}`;
+    }
+
+    private handleError(socket: Socket, err: unknown, event: string) {
+        const message = err instanceof Error ? err.message : "Something went wrong";
+        this.logger.error(`${event} failed for socket ${socket.id}: ${message}`);
+        this.emitError(socket, message);
+    }
+
+    private emitError(socket: Socket, message: string) {
+        socket.emit("error", { message });
+    }
+}

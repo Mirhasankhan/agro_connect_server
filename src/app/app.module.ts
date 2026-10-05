@@ -14,6 +14,7 @@ import { AdminModule } from "@/modules/admin/admin.module";
 import { ProductModule } from "@/modules/product/product.module";
 import { ShoppingModule } from "@/modules/shopping/shopping.module";
 import { OrderModule } from "@/modules/order/order.module";
+import { SocketModule } from "@/modules/socket/socket.module";
 
 @Module({
     imports: [
@@ -43,6 +44,7 @@ import { OrderModule } from "@/modules/order/order.module";
                 },
             ],
         }),
+        SocketModule,
         AuthModule,
         AdminModule,
         OrderModule,
@@ -50,6 +52,7 @@ import { OrderModule } from "@/modules/order/order.module";
         ShoppingModule,
         ShippingAddressModule,
         CommonModule,
+        
     ],
     controllers: [AppController],
     providers: [

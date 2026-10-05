@@ -1,403 +1,436 @@
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "mongodb"
-    url      = env("DATABASE_URL")
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-    id               String         @id @default(auto()) @map("_id") @db.ObjectId
-    fullName         String
-    email            String         @unique
-    password         String
-    phone            String?
-    role             UserRole
-    status           ActivityStatus @default(ACTIVE)
-    deleted          Boolean        @default(false)
-    isSetupCompleted Boolean        @default(false)
-    profileImage     String?
-    fcmToken         String?
-    stripeCustomerId String?
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  fullName         String
+  email            String         @unique
+  password         String
+  phone            String?
+  role             UserRole
+  status           ActivityStatus @default(ACTIVE)
+  deleted          Boolean        @default(false)
+  isSetupCompleted Boolean        @default(false)
+  profileImage     String?
+  fcmToken         String?
+  stripeCustomerId String?
 
-    createdAt         DateTime          @default(now())
-    updatedAt         DateTime          @updatedAt
-    shippingAddresses ShippingAddress[]
-    producerProfile   ProducerProfile?
-    products          Product[]
-    carts             Cart[]
-    wishlists         Wishlist[]
-    orders            Order[]
-    driverProfile     DriverProfile?
-    deliveries        Delivery[]
-    producerEarnings  ProducerEarning[]
-    driverEarnings    DriverEarning[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  shippingAddresses ShippingAddress[]
+  producerProfile   ProducerProfile?
+  products          Product[]
+  carts             Cart[]
+  wishlists         Wishlist[]
+  orders            Order[]
+  driverProfile     DriverProfile?
+  deliveries        Delivery[]
+  producerEarnings  ProducerEarning[]
+  driverEarnings    DriverEarning[]
+  conversationsA    Conversation[]    @relation("ConversationParticipantA")
+  conversationsB    Conversation[]    @relation("ConversationParticipantB")
+  sentMessages      ChatMessage[]     @relation("MessageSender")
+  receivedMessages  ChatMessage[]     @relation("MessageReceiver")
 
-    @@map("users")
+  @@map("users")
 }
 
 model RegistrationVerification {
-    id        String   @id @default(auto()) @map("_id") @db.ObjectId
-    fullName  String
-    email     String   @unique
-    password  String  
-    role      UserRole
-    otpHash   String
-    expiresAt DateTime
-    createdAt DateTime @default(now())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  fullName  String
+  email     String   @unique
+  password  String
+  role      UserRole
+  otpHash   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Conversation {
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  participantA     String        @db.ObjectId
+  participantB     String        @db.ObjectId
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  participantAUser User          @relation("ConversationParticipantA", fields: [participantA], references: [id])
+  participantBUser User          @relation("ConversationParticipantB", fields: [participantB], references: [id])
+  messages         ChatMessage[]
+
+  @@unique([participantA, participantB])
+}
+
+model ChatMessage {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  senderId       String       @db.ObjectId
+  receiverId     String       @db.ObjectId
+  message        String
+  images         String[]     @default([])
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+  receiver       User         @relation("MessageReceiver", fields: [receiverId], references: [id])
+
+  @@index([conversationId, createdAt])
 }
 
 model ProducerProfile {
-    id     String @id @default(auto()) @map("_id") @db.ObjectId
-    userId String @unique @db.ObjectId
-    user   User   @relation(fields: [userId], references: [id])
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
 
-    // Basic producer information
-    farmName     String?
-    producerType ProducerType
-    farmSize     String?
+  // Basic producer information
+  farmName     String?
+  producerType ProducerType
+  farmSize     String?
 
-    // Location
-    address  String
-    district String
-    region   String
+  // Location
+  address  String
+  district String
+  region   String
 
-    // Production information
-    productionTypes String[]
+  // Production information
+  productionTypes String[]
 
-    // Verification documents
-    nidNumber    String?
-    nidUrl       String?
-    tradeLicense String?
-    tinNumber    String?
+  // Verification documents
+  nidNumber    String?
+  nidUrl       String?
+  tradeLicense String?
+  tinNumber    String?
 
-    // Verification
-    verificationStatus VerificationStatus @default(Pending)
-    rejectionReason    String?
+  // Verification
+  verificationStatus VerificationStatus @default(Pending)
+  rejectionReason    String?
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ProducerEarning {
-    id               String    @id @default(auto()) @map("_id") @db.ObjectId
-    producerId       String    @db.ObjectId
-    orderItemId      String    @db.ObjectId
-    amount           Float
-    isTransferred    Boolean   @default(false)
-    stripeTransferId String?
-    paidAt           DateTime?
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  producerId       String    @db.ObjectId
+  orderItemId      String    @db.ObjectId
+  amount           Float
+  isTransferred    Boolean   @default(false)
+  stripeTransferId String?
+  paidAt           DateTime?
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    producer  User      @relation(fields: [producerId], references: [id])
-    orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+  producer  User      @relation(fields: [producerId], references: [id])
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
 
-    @@unique([orderItemId])
+  @@unique([orderItemId])
 }
 
 model DriverProfile {
-    id          String   @id @default(auto()) @map("_id") @db.ObjectId
-    userId      String   @unique @db.ObjectId
-    user        User     @relation(fields: [userId], references: [id])
-    // Personal / identity information
-    nidNumber   String
-    dateOfBirth DateTime
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  // Personal / identity information
+  nidNumber   String
+  dateOfBirth DateTime
 
-    // Driving information
-    drivingLicenseNumber String
-    licenseUrl           String
+  // Driving information
+  drivingLicenseNumber String
+  licenseUrl           String
 
-    // Vehicle information
-    vehicleType         DriverVehicleType
-    vehicleRegistration String
-    vehicleModel        String
-    vehicleColor        String
+  // Vehicle information
+  vehicleType         DriverVehicleType
+  vehicleRegistration String
+  vehicleModel        String
+  vehicleColor        String
 
-    // Location
-    address  String?
-    district String
+  // Location
+  address  String?
+  district String
 
-    // Verification
-    verificationStatus VerificationStatus @default(Pending)
-    rejectionReason    String?
-    isAvailable        Boolean            @default(false)
+  // Verification
+  verificationStatus VerificationStatus @default(Pending)
+  rejectionReason    String?
+  isAvailable        Boolean            @default(false)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model DriverEarning {
-    id               String    @id @default(auto()) @map("_id") @db.ObjectId
-    driverId         String    @db.ObjectId
-    orderId          String    @unique @db.ObjectId
-    amount           Int
-    isTransferred    Boolean   @default(false)
-    stripeTransferId String?
-    paidAt           DateTime?
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  driverId         String    @db.ObjectId
+  orderId          String    @unique @db.ObjectId
+  amount           Int
+  isTransferred    Boolean   @default(false)
+  stripeTransferId String?
+  paidAt           DateTime?
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    driver User  @relation(fields: [driverId], references: [id])
-    order  Order @relation(fields: [orderId], references: [id])
+  driver User  @relation(fields: [driverId], references: [id])
+  order  Order @relation(fields: [orderId], references: [id])
 }
 
 enum ProducerType {
-    Individual
-    Farm
-    Business
+  Individual
+  Farm
+  Business
 }
 
 enum VerificationStatus {
-    Pending
-    Accepted
-    Rejected
+  Pending
+  Accepted
+  Rejected
 }
 
 enum DriverVehicleType {
-    BIKE
-    MOTORCYCLE
-    THREE_WHEELER
-    VAN
-    TRUCK
-    PICKUP
+  BIKE
+  MOTORCYCLE
+  THREE_WHEELER
+  VAN
+  TRUCK
+  PICKUP
 }
 
 model Otp {
-    id        String   @id @default(auto()) @map("_id") @db.ObjectId
-    email     String   @unique
-    otpHash   String
-    expiresAt DateTime
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  otpHash   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    @@map("otps")
+  @@map("otps")
 }
 
 model ShippingAddress {
-    id          String   @id @default(auto()) @map("_id") @db.ObjectId
-    userId      String   @db.ObjectId
-    addressLine String
-    city        String
-    postCode    String
-    country     String
-    instruction String
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
-    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    orders      Order[]
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  addressLine String
+  city        String
+  postCode    String
+  country     String
+  instruction String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders      Order[]
 
-    @@map("shipping_Addresses")
+  @@map("shipping_Addresses")
 }
 
 model Category {
-    id          String  @id @default(auto()) @map("_id") @db.ObjectId
-    name        String
-    slug        String  @unique
-    description String
-    imageUrl    String
-    isActive    Boolean @default(true)
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String  @unique
+  description String
+  imageUrl    String
+  isActive    Boolean @default(true)
 
-    createdAt DateTime  @default(now())
-    updatedAt DateTime  @updatedAt
-    products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
 }
 
 model Product {
-    id String @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-    producerId String   @db.ObjectId
-    producer   User     @relation(fields: [producerId], references: [id], onDelete: Cascade)
-    categoryId String   @db.ObjectId
-    category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  producerId String   @db.ObjectId
+  producer   User     @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  categoryId String   @db.ObjectId
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-    name              String
-    description       String
-    imageUrls         String[]
-    sellingUnit       SellingUnit
-    pricePerUnit      Float
-    availableQuantity Int
+  name              String
+  description       String
+  imageUrls         String[]
+  sellingUnit       SellingUnit
+  pricePerUnit      Float
+  availableQuantity Int
 
-    pricingTiers PricingTier[]
-    isFeatured   Boolean       @default(false)
-    isActive     Boolean       @default(true)
-    avgRating    Float         @default(0)
-    totalReviews Int           @default(0)
+  pricingTiers PricingTier[]
+  isFeatured   Boolean       @default(false)
+  isActive     Boolean       @default(true)
+  avgRating    Float         @default(0)
+  totalReviews Int           @default(0)
 
-    createdAt  DateTime    @default(now())
-    updatedAt  DateTime    @updatedAt
-    carts      Cart[]
-    wishlists  Wishlist[]
-    orderItems OrderItem[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  carts      Cart[]
+  wishlists  Wishlist[]
+  orderItems OrderItem[]
 }
 
 model PricingTier {
-    id           String  @id @default(auto()) @map("_id") @db.ObjectId
-    productId    String  @db.ObjectId
-    product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-    quantity     Int
-    pricePerUnit Float
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  productId    String  @db.ObjectId
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity     Int
+  pricePerUnit Float
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Cart {
-    id        String @id @default(auto()) @map("_id") @db.ObjectId
-    userId    String @db.ObjectId
-    productId String @db.ObjectId
-    quantity  Int    @default(1)
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String @db.ObjectId
+  productId String @db.ObjectId
+  quantity  Int    @default(1)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, productId])
-    @@map("carts")
+  @@unique([userId, productId])
+  @@map("carts")
 }
 
 model Wishlist {
-    id        String @id @default(auto()) @map("_id") @db.ObjectId
-    userId    String @db.ObjectId
-    productId String @db.ObjectId
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String @db.ObjectId
+  productId String @db.ObjectId
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, productId])
-    @@map("wishlists")
+  @@unique([userId, productId])
+  @@map("wishlists")
 }
 
 model Order {
-    id                    String        @id @default(auto()) @map("_id") @db.ObjectId
-    orderId               String
-    customerId            String        @db.ObjectId
-    totalAmount           Float
-    status                OrderStatus   @default(Pending)
-    stripePaymentIntentId String?
-    paymentStatus         PaymentStatus @default(Pending)
+  id                    String        @id @default(auto()) @map("_id") @db.ObjectId
+  orderId               String
+  customerId            String        @db.ObjectId
+  totalAmount           Float
+  status                OrderStatus   @default(Pending)
+  stripePaymentIntentId String?
+  paymentStatus         PaymentStatus @default(Pending)
 
-    cancelReason      String?
-    shippingAddressId String  @db.ObjectId
+  cancelReason      String?
+  shippingAddressId String  @db.ObjectId
 
-    customer        User            @relation(fields: [customerId], references: [id], onDelete: Cascade)
-    shippingAddress ShippingAddress @relation(fields: [shippingAddressId], references: [id], onDelete: NoAction)
+  customer        User            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  shippingAddress ShippingAddress @relation(fields: [shippingAddressId], references: [id], onDelete: NoAction)
 
-    items OrderItem[]
+  items OrderItem[]
 
-    createdAt     DateTime       @default(now())
-    updatedAt     DateTime       @updatedAt
-    deliveries    Delivery[]
-    driverEarning DriverEarning?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deliveries    Delivery[]
+  driverEarning DriverEarning?
 
-    @@map("orders")
+  @@map("orders")
 }
 
 model OrderItem {
-    id        String @id @default(auto()) @map("_id") @db.ObjectId
-    orderId   String @db.ObjectId
-    productId String @db.ObjectId
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String @db.ObjectId
+  productId String @db.ObjectId
 
-    productName String
-    sellingUnit SellingUnit
-    quantity    Int
+  productName String
+  sellingUnit SellingUnit
+  quantity    Int
 
-    unitPrice Float
-    subtotal  Float
+  unitPrice Float
+  subtotal  Float
 
-    cancelReason String?
-    isReviewed   Boolean    @default(false)
-    status       ItemStatus @default(Pending)
+  cancelReason String?
+  isReviewed   Boolean    @default(false)
+  status       ItemStatus @default(Pending)
 
-    order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-    product Product @relation(fields: [productId], references: [id], onDelete: NoAction)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: NoAction)
 
-    createdAt       DateTime         @default(now())
-    updatedAt       DateTime         @updatedAt
-    producerEarning ProducerEarning?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  producerEarning ProducerEarning?
 
-    @@map("orderItems")
+  @@map("orderItems")
 }
 
 model Delivery {
-    id        String         @id @default(auto()) @map("_id") @db.ObjectId
-    orderId   String         @unique @db.ObjectId
-    driverId  String         @db.ObjectId
-    status    DeliveryStatus @default(Assigned)
-    otpHash   String?
-    latitude  Float?
-    longitude Float?
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String         @unique @db.ObjectId
+  driverId  String         @db.ObjectId
+  status    DeliveryStatus @default(Assigned)
+  otpHash   String?
+  latitude  Float?
+  longitude Float?
 
-    order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-    driver User  @relation(fields: [driverId], references: [id])
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driver User  @relation(fields: [driverId], references: [id])
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    @@map("deliveries")
+  @@map("deliveries")
 }
 
 enum OrderStatus {
-    Pending
-    Active
-    PartiallyCancelled
-    Shipped
-    Delivered
-    Cancelled
-    Refunded
+  Pending
+  Active
+  PartiallyCancelled
+  Shipped
+  Delivered
+  Cancelled
+  Refunded
 }
 
 enum ItemStatus {
-    Pending
-    SentToHub
-    Delivered
-    Cancelled
-    Refunded
+  Pending
+  SentToHub
+  Delivered
+  Cancelled
+  Refunded
 }
 
 enum DeliveryStatus {
-    Assigned
-    PickedUp
-    Delivered
+  Assigned
+  PickedUp
+  Delivered
 }
 
 enum PaymentStatus {
-    Pending
-    Paid
-    Failed
-    PartiallyRefunded
-    Refunded
+  Pending
+  Paid
+  Failed
+  PartiallyRefunded
+  Refunded
 }
 
 enum SellingUnit {
-    KG
-    GRAM
-    PIECE
-    DOZEN
-    LITER
-    BAG
-    BUNDLE
+  KG
+  GRAM
+  PIECE
+  DOZEN
+  LITER
+  BAG
+  BUNDLE
 }
 
 // ---------------- ENUM ----------------
 
 enum UserRole {
-    ADMIN
-    PRODUCER
-    BUYER
-    DRIVER
+  ADMIN
+  PRODUCER
+  BUYER
+  DRIVER
 }
 
 enum ActivityStatus {
-    ACTIVE
-    INACTIVE
-    SUSPENDED
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
