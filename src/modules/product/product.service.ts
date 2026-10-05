@@ -99,6 +99,9 @@ export class ProductService {
             })
             .rawFilter({
                 isActive: true,
+                availableQuantity: {
+                    gt: 0,
+                },
                 category: {
                     isActive: true,
                 },
@@ -156,17 +159,30 @@ export class ProductService {
                 pricePerUnit: true,
                 availableQuantity: true,
                 imageUrls: true,
-                avgRating:true,
-                totalReviews:true,                
+                avgRating: true,
+                totalReviews: true,
                 category: {
                     select: {
-                        name: true                        
+                        name: true,
                     },
                 },
                 pricingTiers: {
                     select: {
                         pricePerUnit: true,
                         quantity: true,
+                    },
+                },
+                reviews: {
+                    select: {
+                        rating: true,
+                        comment: true,
+                        createdAt: true,
+                        buyer: {
+                            select: {
+                                fullName: true,
+                                profileImage: true,
+                            },
+                        },
                     },
                 },
                 wishlists: user?.id

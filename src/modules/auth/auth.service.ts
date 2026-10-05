@@ -473,11 +473,11 @@ export class AuthService {
 
         if (
             payload.producerType === "Farm" &&
-            (!payload.farmSize || !payload.farmName)
+            (!payload.farmSize || !payload.farmName || !payload.farmAddress)
         ) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
-                "Farm size and name are required for Farm type producer",
+                "Farm size, name, and address are required for Farm type producer",
             );
         }
 

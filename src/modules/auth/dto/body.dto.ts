@@ -115,6 +115,10 @@ export class CreateProducerProfileDto {
     @IsString()
     farmSize?: string;
 
+    @IsOptional()
+    @IsString()
+    farmAddress?: string;
+
     @IsString()
     address: string;
 

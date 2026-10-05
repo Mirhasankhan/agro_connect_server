@@ -37,6 +37,7 @@ model User {
   conversationsB    Conversation[]    @relation("ConversationParticipantB")
   sentMessages      ChatMessage[]     @relation("MessageSender")
   receivedMessages  ChatMessage[]     @relation("MessageReceiver")
+  reviews           Review[]
 
   @@map("users")
 }
@@ -90,6 +91,7 @@ model ProducerProfile {
   farmName     String?
   producerType ProducerType
   farmSize     String?
+  farmAddress  String?
 
   // Location
   address  String
@@ -265,6 +267,7 @@ model Product {
   carts      Cart[]
   wishlists  Wishlist[]
   orderItems OrderItem[]
+  reviews    Review[]
 }
 
 model PricingTier {
@@ -356,6 +359,7 @@ model OrderItem {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   producerEarning ProducerEarning?
+  review          Review?
 
   @@map("orderItems")
 }
@@ -376,6 +380,24 @@ model Delivery {
   updatedAt DateTime @updatedAt
 
   @@map("deliveries")
+}
+
+model Review {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  buyerId     String @db.ObjectId
+  orderItemId String @unique @db.ObjectId
+  productId   String @db.ObjectId
+  rating      Int
+  comment     String
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  buyer     User      @relation(fields: [buyerId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id], onDelete: NoAction)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
 }
 
 enum OrderStatus {

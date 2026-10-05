@@ -112,6 +112,7 @@ export class StripeService {
             { idempotencyKey },
         );
     }
+    
 
     async constructEvent(
         payload: string | Buffer<ArrayBufferLike>,
