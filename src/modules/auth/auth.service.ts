@@ -64,8 +64,7 @@ export class AuthService {
             update: {
                 otpHash: hashedOtp,
                 expiresAt: new Date(otpExpiry),
-                fullName: payload.fullName,
-                phone: payload.phone,
+                fullName: payload.fullName,               
                 role: payload.role,
                 password: hashedPassword,
             },
@@ -129,8 +128,7 @@ export class AuthService {
                 data: {
                     email: userData.email,
                     password: userData.password,
-                    fullName: userData.fullName,
-                    phone: userData.phone,
+                    fullName: userData.fullName,                 
                     role: userData.role,
                     fcmToken: payload.fcmToken,
                 },
@@ -451,7 +449,10 @@ export class AuthService {
     async createProducerProfile(
         user: UserPayload,
         payload: CreateProducerProfileDto,
-        file?: Express.Multer.File,
+        files?: {
+            tradeLicense?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
     ) {
         const existingProfile = await this.prisma.producerProfile.findUnique({
             where: {
@@ -470,8 +471,8 @@ export class AuthService {
         }
 
         if (
-            (payload.producerType === "Farm" && !payload.farmSize) ||
-            !payload.farmName
+            payload.producerType === "Farm" &&
+            (!payload.farmSize || !payload.farmName)
         ) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
@@ -486,15 +487,44 @@ export class AuthService {
             );
         }
 
-        let tradeLicenseUrl = null;
+        const tradeLicenseFile = files?.tradeLicense?.[0];
+        const nidFile = files?.nidUrl?.[0];
 
-        if (file) {
-            tradeLicenseUrl = await this.fileService.uploadToCloudinary(file);
+        if (payload.producerType === "Individual" && !nidFile) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "NID document is required for Individual type producer",
+            );
+        }
+
+        let tradeLicenseUrl: string | null = null;
+        let nidUrl: string | null = null;
+
+        try {
+            if (tradeLicenseFile) {
+                tradeLicenseUrl =
+                    await this.fileService.uploadToCloudinary(
+                        tradeLicenseFile,
+                    );
+            }
+
+            if (nidFile) {
+                nidUrl = await this.fileService.uploadToCloudinary(nidFile);
+            }
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+
+            throw new ApiError(
+                HttpStatus.BAD_GATEWAY,
+                "Producer document upload failed",
+            );
         }
 
         if (
-            (payload.producerType === "Business" && !tradeLicenseUrl) ||
-            !payload.tinNumber
+            payload.producerType === "Business" &&
+            (!tradeLicenseUrl || !payload.tinNumber)
         ) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
@@ -506,6 +536,7 @@ export class AuthService {
             data: {
                 userId: user.id,
                 tradeLicense: tradeLicenseUrl,
+                nidUrl,
                 ...payload,
             },
         });

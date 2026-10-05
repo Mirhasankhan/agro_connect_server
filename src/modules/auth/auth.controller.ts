@@ -6,6 +6,7 @@ import {
     Post,
     Req,
     UploadedFile,
+    UploadedFiles,
     UseInterceptors,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
@@ -27,7 +28,10 @@ import {
 } from "./dto/body.dto";
 import { UserPayload } from "@/common/guards/auth.guard";
 import { Roles } from "@/common/decorators/roles.decorator";
-import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
+import {
+    CustomFileFieldsInterceptor,
+    CustomFileInterceptor,
+} from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
 import { UserRole } from "@prisma/client";
 
@@ -149,20 +153,27 @@ export class AuthController {
     @Post("create-producer-profile")
     @Roles(UserRole.PRODUCER)
     @UseInterceptors(
-        CustomFileInterceptor("tradeLicense"),
+        CustomFileFieldsInterceptor([
+            { name: "tradeLicense", maxCount: 1 },
+            { name: "nidUrl", maxCount: 1 },
+        ]),
         ParseFormDataInterceptor,
     )
     @ApiOperation({ summary: "Create Producer Profile" })
     async createProducerProfile(
         @Body() payload: CreateProducerProfileDto,
         @Req() req: Request,
-        @UploadedFile() file?: Express.Multer.File,
+        @UploadedFiles()
+        files?: {
+            tradeLicense?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
     ) {
         const user = req.user as UserPayload;
         const result = await this.authService.createProducerProfile(
             user,
             payload,
-            file,
+            files,
         );
 
         return ResponseService.formatResponse({

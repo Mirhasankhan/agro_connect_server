@@ -12,7 +12,7 @@ model User {
     fullName         String
     email            String         @unique
     password         String
-    phone            String
+    phone            String?
     role             UserRole
     status           ActivityStatus @default(ACTIVE)
     deleted          Boolean        @default(false)
@@ -41,8 +41,7 @@ model RegistrationVerification {
     id        String   @id @default(auto()) @map("_id") @db.ObjectId
     fullName  String
     email     String   @unique
-    password  String
-    phone     String
+    password  String  
     role      UserRole
     otpHash   String
     expiresAt DateTime

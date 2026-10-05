@@ -1,6 +1,5 @@
 import {
     IsEmail,
-    IsPhoneNumber,
     IsString,
     IsIn,
     IsOptional,
@@ -17,9 +16,6 @@ export class RegisterUserDto {
 
     @IsEmail()
     email: string;
-
-    @IsPhoneNumber()
-    phone: string;
 
     @IsString()
     password: string;
