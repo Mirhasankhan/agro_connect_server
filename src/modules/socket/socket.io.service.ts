@@ -1,5 +1,5 @@
 import { PrismaService } from "@/core/services/prisma/prisma.service";
-import { Logger } from "@nestjs/common";
+import { HttpStatus, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import {
@@ -15,6 +15,7 @@ import { UserRole } from "@prisma/client";
 import { Server, Socket } from "socket.io";
 import config from "@/config";
 import { SocketPresenceService } from "./socket.presence.service";
+import { ApiError } from "@/common/errors/api_error";
 
 type SubscribePayload = {
     userId: string;
@@ -44,11 +45,14 @@ export class WebsocketGateway
         private readonly presence: SocketPresenceService,
     ) {}
 
-   
     async handleConnection(socket: Socket) {
         try {
             const token = this.extractToken(socket);
-            if (!token) throw new Error("No token provided");
+            if (!token)
+                throw new ApiError(
+                    HttpStatus.UNAUTHORIZED,
+                    "No token provided",
+                );
 
             const payload = await this.jwtService.verifyAsync(token, {
                 secret:
@@ -58,16 +62,19 @@ export class WebsocketGateway
 
             // Support the most common JWT id claim names
             const userId = (payload.id ?? payload.userId ?? payload.sub) as
-                | string
-                | undefined;
-            if (!userId) throw new Error("Token has no user id claim");
+                string | undefined;
+            if (!userId)
+                throw new ApiError(
+                    HttpStatus.UNAUTHORIZED,
+                    "Token has no user id claim",
+                );
 
             const user = await this.prisma.user.findUnique({
                 where: { id: userId },
                 select: { id: true, deleted: true },
             });
 
-            if (!user || user.deleted) throw new Error("Invalid user");
+            if (!user || user.deleted) throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid user");
 
             socket.data.userId = userId;
             this.presence.add(userId, socket.id);
@@ -89,7 +96,6 @@ export class WebsocketGateway
         this.presence.remove(userId, socket.id);
     }
 
-  
     @SubscribeMessage("subscribe")
     async subscribe(
         @MessageBody() rawPayload: unknown,
@@ -156,9 +162,7 @@ export class WebsocketGateway
                     participant: participant
                         ? {
                               ...participant,
-                              isOnline: this.presence.isOnline(
-                                  participant.id,
-                              ),
+                              isOnline: this.presence.isOnline(participant.id),
                           }
                         : null,
                 },
@@ -185,7 +189,10 @@ export class WebsocketGateway
 
             const payload = this.parsePayload<MessagePayload>(rawPayload);
             if (!payload.receiverId || !payload.message?.trim()) {
-                return this.emitError(socket, "Receiver and message are required");
+                return this.emitError(
+                    socket,
+                    "Receiver and message are required",
+                );
             }
 
             const conversation = await this.getOrCreateConversation(
@@ -194,7 +201,10 @@ export class WebsocketGateway
             );
             const room = this.roomName(conversation.id);
             if (!socket.rooms.has(room)) {
-                return this.emitError(socket, "Subscribe to the conversation first");
+                return this.emitError(
+                    socket,
+                    "Subscribe to the conversation first",
+                );
             }
 
             const savedMessage = await this.prisma.chatMessage.create({
@@ -213,10 +223,23 @@ export class WebsocketGateway
             });
 
             const sockets = await this.server.in(room).fetchSockets();
+            const isRecipientSubscribed = sockets.some(
+                (targetSocket) =>
+                    targetSocket.data.userId === payload.receiverId,
+            );
+
+            if (isRecipientSubscribed) {
+                await this.prisma.chatMessage.update({
+                    where: { id: savedMessage.id },
+                    data: { isRead: true },
+                });
+            }
+
             for (const targetSocket of sockets) {
                 const { senderId, ...message } = savedMessage;
                 targetSocket.emit("message", {
                     ...message,
+                    isRead: isRecipientSubscribed,
                     isSendByMe: senderId === targetSocket.data.userId,
                 });
             }
@@ -224,7 +247,6 @@ export class WebsocketGateway
             this.handleError(socket, err, "sendMessage");
         }
     }
-
 
     private extractToken(socket: Socket): string | null {
         const { auth, query, headers } = socket.handshake;
@@ -244,7 +266,6 @@ export class WebsocketGateway
         return token || null;
     }
 
-   
     private parsePayload<T>(payload: unknown): Partial<T> {
         if (typeof payload === "string") {
             try {
@@ -293,7 +314,9 @@ export class WebsocketGateway
         }
 
         return this.prisma.conversation.upsert({
-            where: { participantA_participantB: { participantA, participantB } },
+            where: {
+                participantA_participantB: { participantA, participantB },
+            },
             create: { participantA, participantB },
             update: {},
         });
@@ -321,8 +344,11 @@ export class WebsocketGateway
     }
 
     private handleError(socket: Socket, err: unknown, event: string) {
-        const message = err instanceof Error ? err.message : "Something went wrong";
-        this.logger.error(`${event} failed for socket ${socket.id}: ${message}`);
+        const message =
+            err instanceof Error ? err.message : "Something went wrong";
+        this.logger.error(
+            `${event} failed for socket ${socket.id}: ${message}`,
+        );
         this.emitError(socket, message);
     }
 
