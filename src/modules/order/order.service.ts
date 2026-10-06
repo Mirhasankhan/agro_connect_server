@@ -462,7 +462,7 @@ export class OrderService {
                                             select: {
                                                 farmName: true,
                                                 address: true,
-                                                district: true,
+                                                city: true,
                                                 farmSize: true,
                                                 producerType: true,
                                             },

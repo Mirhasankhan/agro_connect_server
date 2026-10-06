@@ -155,7 +155,11 @@ export class AuthController {
     @Roles(UserRole.PRODUCER)
     @UseInterceptors(
         CustomFileFieldsInterceptor([
-            { name: "tradeLicense", maxCount: 1 },
+            { name: "landCertificate", maxCount: 1 },
+            { name: "farmPhotoUrl", maxCount: 1 },
+            { name: "companyCertificate", maxCount: 1 },
+            { name: "rcmUrl", maxCount: 1 },
+            { name: "taxUrl", maxCount: 1 },
             { name: "nidUrl", maxCount: 1 },
         ]),
         ParseFormDataInterceptor,
@@ -166,7 +170,11 @@ export class AuthController {
         @Req() req: Request,
         @UploadedFiles()
         files?: {
-            tradeLicense?: Express.Multer.File[];
+            landCertificate?: Express.Multer.File[];
+            farmPhotoUrl?: Express.Multer.File[];
+            companyCertificate?: Express.Multer.File[];
+            rcmUrl?: Express.Multer.File[];
+            taxUrl?: Express.Multer.File[];
             nidUrl?: Express.Multer.File[];
         },
     ) {

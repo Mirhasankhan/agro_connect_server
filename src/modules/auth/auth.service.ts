@@ -451,7 +451,11 @@ export class AuthService {
         user: UserPayload,
         payload: CreateProducerProfileDto,
         files?: {
-            tradeLicense?: Express.Multer.File[];
+            landCertificate?: Express.Multer.File[];
+            farmPhotoUrl?: Express.Multer.File[];
+            companyCertificate?: Express.Multer.File[];
+            rcmUrl?: Express.Multer.File[];
+            taxUrl?: Express.Multer.File[];
             nidUrl?: Express.Multer.File[];
         },
     ) {
@@ -471,17 +475,11 @@ export class AuthService {
             );
         }
 
-        if (
-            payload.producerType === "Farm" &&
-            (!payload.farmSize || !payload.farmName || !payload.farmAddress)
-        ) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                "Farm size, name, and address are required for Farm type producer",
-            );
-        }
-
-        const tradeLicenseFile = files?.tradeLicense?.[0];
+        const landCertificateFile = files?.landCertificate?.[0];
+        const farmPhotoFile = files?.farmPhotoUrl?.[0];
+        const companyCertificateFile = files?.companyCertificate?.[0];
+        const rcmFile = files?.rcmUrl?.[0];
+        const taxFile = files?.taxUrl?.[0];
         const nidFile = files?.nidUrl?.[0];
 
         if (!nidFile) {
@@ -491,17 +489,66 @@ export class AuthService {
             );
         }
 
-        let tradeLicenseUrl: string | null = null;
-        let nidUrl: string | null = null;
+        if (
+            payload.producerType === "Private" &&
+            (!landCertificateFile || !farmPhotoFile)
+        ) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Land certificate and farm photo are required for Private type producer",
+            );
+        }
+
+        if (
+            payload.producerType === "Company" &&
+            (!payload.companyName ||
+                !payload.rccmNo ||
+                !payload.sirenNo ||
+                !companyCertificateFile ||
+                !rcmFile ||
+                !taxFile)
+        ) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Company name, RCCM number, SIREN number, company certificate, RCM, and tax documents are required for Company type producer",
+            );
+        }
+
+        let landCertificate: string | null = null;
+        let farmPhotoUrl: string | null = null;
+        let companyCertificate: string | null = null;
+        let rcmUrl: string | null = null;
+        let taxUrl: string | null = null;
+        let nidUrl: string;
 
         try {
-            if (tradeLicenseFile) {
-                tradeLicenseUrl =
-                    await this.fileService.uploadToCloudinary(tradeLicenseFile);
+            nidUrl = await this.fileService.uploadToCloudinary(nidFile);
+
+            if (landCertificateFile) {
+                landCertificate =
+                    await this.fileService.uploadToCloudinary(
+                        landCertificateFile,
+                    );
             }
 
-            if (nidFile) {
-                nidUrl = await this.fileService.uploadToCloudinary(nidFile);
+            if (farmPhotoFile) {
+                farmPhotoUrl =
+                    await this.fileService.uploadToCloudinary(farmPhotoFile);
+            }
+
+            if (companyCertificateFile) {
+                companyCertificate =
+                    await this.fileService.uploadToCloudinary(
+                        companyCertificateFile,
+                    );
+            }
+
+            if (rcmFile) {
+                rcmUrl = await this.fileService.uploadToCloudinary(rcmFile);
+            }
+
+            if (taxFile) {
+                taxUrl = await this.fileService.uploadToCloudinary(taxFile);
             }
         } catch (error) {
             if (error instanceof ApiError) {
@@ -514,25 +561,16 @@ export class AuthService {
             );
         }
 
-        if (
-            payload.producerType === "Business" &&
-            (!tradeLicenseUrl ||
-                !payload.tinNumber ||
-                !payload.businessRegistrationNumber ||
-                !payload.businessName)
-        ) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                "Trade license, TIN number, business registration number, and business name are required for Business type producer",
-            );
-        }
-
         await this.prisma.producerProfile.create({
             data: {
                 userId: user.id,
-                tradeLicense: tradeLicenseUrl,
                 nidUrl,
                 ...payload,
+                landCertificate,
+                farmPhotoUrl,
+                companyCertificate,
+                rcmUrl,
+                taxUrl,
             },
         });
 

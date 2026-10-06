@@ -3,10 +3,10 @@ import {
     IsString,
     IsIn,
     IsOptional,
-    IsArray,
     IsEnum,
     IsNotEmpty,
     IsDateString,   
+    IsNumber,
 } from "class-validator";
 import { UserRole, ProducerType, DriverVehicleType } from "@prisma/client";
 
@@ -100,44 +100,41 @@ export class RefreshTokenDto {
 }
 
 export class CreateProducerProfileDto {
-    @IsOptional()
     @IsString()
-    farmName?: string;
+    phoneNumber: string;
 
     @IsEnum(ProducerType)
     producerType: ProducerType;
 
-    @IsOptional()
     @IsString()
-    farmSize?: string;
+    city: string;
 
-    @IsOptional()
     @IsString()
-    farmAddress?: string;
+    region: string;
 
     @IsString()
     address: string;
 
     @IsString()
-    district: string;
-    @IsString()
-    region: string;
+    farmName: string;
 
-    @IsArray()
-    @IsString({ each: true })
-    productionTypes: string[];
+    @IsNumber()
+    farmSize: number;
 
-    @IsOptional()
     @IsString()
-    businessRegistrationNumber?: string;
+    farmLocation: string;
 
     @IsOptional()
     @IsString()
-    businessName?: string;
+    companyName?: string;
 
     @IsOptional()
     @IsString()
-    tinNumber?: string;
+    rccmNo?: string;
+
+    @IsOptional()
+    @IsString()
+    sirenNo?: string;
 }
 
 export class CreateDriverProfileDto {
