@@ -9,6 +9,7 @@ import {
     IsOptional,
     ValidateNested,
     IsBoolean,
+    IsIn,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { SellingUnit } from "@prisma/client";
@@ -41,6 +42,10 @@ export class ProductDto {
     @IsEnum(SellingUnit)
     sellingUnit: SellingUnit;
 
+    @IsOptional()
+    @IsBoolean()
+    isFeatured?: boolean;
+
     @IsInt()
     @Min(1)
     pricePerUnit: number;
@@ -49,6 +54,7 @@ export class ProductDto {
     @Min(1)
     availableQuantity: number;
 
+    @IsOptional()
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => PricingTierDto)
@@ -69,6 +75,10 @@ export class ProductQueryDto {
     sellingUnit?: SellingUnit;
 
     @IsOptional()
+    @IsIn(["active", "outOfStock"])
+    status?: string;
+
+    @IsOptional()
     @IsString()
     minPrice?: string;
 
@@ -77,7 +87,7 @@ export class ProductQueryDto {
     maxPrice?: string;
 
     @IsOptional()
-    @IsString()
+    @IsIn(["pricePerUnit", "availableQuantity"])
     sort?: string;
 
     @IsOptional()

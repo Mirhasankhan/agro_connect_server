@@ -276,6 +276,7 @@ model Product {
 
   pricingTiers PricingTier[]
   isFeatured   Boolean       @default(false)
+  isCertified  Boolean       @default(false)
   isActive     Boolean       @default(true)
   avgRating    Float         @default(0)
   totalReviews Int           @default(0)

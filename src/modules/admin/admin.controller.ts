@@ -84,7 +84,8 @@ export class AdminController {
 
     @Post("create-category")
     @ApiOperation({ summary: "Create new category" })
-    @Roles(UserRole.ADMIN)
+    @IsPublic()
+    // @Roles(UserRole.ADMIN)
     @UseInterceptors(
         CustomFileInterceptor("imageUrl"),
         ParseFormDataInterceptor,

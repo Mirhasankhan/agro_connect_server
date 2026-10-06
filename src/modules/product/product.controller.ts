@@ -74,6 +74,21 @@ export class ProductController {
         });
     }
 
+    @Get("producer-wise")
+    @Roles(UserRole.PRODUCER)
+    @OptionalAuth()
+    @ApiOperation({ summary: "Get all products by producer" })
+    async getAllProductsByProducer(@Req() req: Request, @Query() query: ProductQueryDto) {
+        const user = req.user as UserPayload;
+        const result = await this.productService.getProductByProducer(user, query);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
     @Get("details/:id")
     @Roles(UserRole.BUYER)
     @OptionalAuth()

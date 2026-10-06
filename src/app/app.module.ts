@@ -46,17 +46,17 @@ import { FeedbackModule } from "@/modules/feedback/feedback.module";
                 },
             ],
         }),
+        ProductModule,
         FeedbackModule,
         PaymentModule,
         SocketModule,
         AuthModule,
         AdminModule,
         OrderModule,
-        ProductModule,
+
         ShoppingModule,
         ShippingAddressModule,
         CommonModule,
-        
     ],
     controllers: [AppController],
     providers: [

@@ -83,13 +83,7 @@ export class ShoppingService {
                         id: true,
                         name: true,
                         pricePerUnit: true,
-                        imageUrls: true,
-                        pricingTiers: {
-                            select: {
-                                pricePerUnit: true,
-                                quantity: true,
-                            },
-                        },
+                        imageUrls: true,                       
                     },
                 },
             },
@@ -241,13 +235,7 @@ export class ShoppingService {
                         id: true,
                         name: true,
                         pricePerUnit: true,
-                        imageUrls: true,
-                        pricingTiers: {
-                            select: {
-                                pricePerUnit: true,
-                                quantity: true,
-                            },
-                        },
+                        imageUrls: true,                       
                     },
                 },
             },

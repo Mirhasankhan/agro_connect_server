@@ -25,170 +25,6 @@ export class OrderService {
         private stripe: StripeService,
     ) {}
 
-    async createOrder(user: UserPayload, payload: CreateOrderDto) {
-        const shippingAddress =
-            await this.prisma.shippingAddress.findUniqueOrThrow({
-                where: {
-                    id: payload.shippingAddressId,
-                    userId: user.id,
-                },
-                select: {
-                    id: true,
-                },
-            });
-
-        const rawCartIds = payload.cartIds;
-
-        const cartIds = Array.isArray(rawCartIds)
-            ? Array.from(new Set(rawCartIds.filter(Boolean)))
-            : [];
-
-        if (cartIds.length === 0) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                "At least one cart item is required to create an order",
-            );
-        }
-
-        const carts = await this.prisma.cart.findMany({
-            where: {
-                userId: user.id,
-                id: {
-                    in: cartIds,
-                },
-            },
-            select: {
-                id: true,
-                quantity: true,
-                product: {
-                    select: {
-                        id: true,
-                        name: true,
-                        sellingUnit: true,
-                        availableQuantity: true,
-                        pricePerUnit: true,
-                        pricingTiers: {
-                            select: {
-                                quantity: true,
-                                pricePerUnit: true,
-                            },
-                            orderBy: {
-                                quantity: "asc",
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        if (carts.length !== cartIds.length) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                "Some cart ids are invalid or do not belong to this user",
-            );
-        }
-
-        const unavailableCart = carts.find(
-            (cart) => cart.quantity > cart.product.availableQuantity,
-        );
-
-        if (unavailableCart) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                `Insufficient quantity available for ${unavailableCart.product.name}`,
-            );
-        }
-
-        const items = carts.map((cart) => {
-            const basePrice = cart.product.pricePerUnit as number;
-            const applicableTier = cart.product.pricingTiers
-                .filter((tier) => tier.quantity <= cart.quantity)
-                .sort((a, b) => b.quantity - a.quantity)[0];
-
-            const unitPrice = applicableTier
-                ? (applicableTier.pricePerUnit as number)
-                : basePrice;
-
-            const subtotal = cart.quantity * unitPrice;
-
-            return {
-                productId: cart.product.id,
-                quantity: cart.quantity,
-                productName: cart.product.name,
-                sellingUnit: cart.product.sellingUnit,
-                unitPrice,
-                subtotal,
-            };
-        });
-
-        const totalAmount =
-            Math.round(
-                items.reduce((total, item) => total + item.subtotal, 0) * 100,
-            ) / 100;    
-
-        const orderId = generateOrderId();
-
-        const order = await this.prisma.$transaction(async (transaction) => {
-            const order = await transaction.order.create({
-                data: {
-                    orderId,
-                    customerId: user.id,
-                    shippingAddressId: shippingAddress.id,
-                    status: "Pending",
-                    totalAmount,
-                    paymentStatus: "Pending",
-
-                    items: {
-                        create: items.map((item) => ({
-                            productId: item.productId,
-                            productName: item.productName,
-                            sellingUnit: item.sellingUnit,
-                            quantity: item.quantity,
-                            unitPrice: item.unitPrice,
-                            subtotal: item.subtotal,
-                            status: "Pending",
-                        })),
-                    },
-                },
-            });
-
-            return order;
-        });
-
-        const checkoutSession = await this.stripe.createCheckoutSession({
-            line_items: items.map((item) => ({
-                price_data: {
-                    currency: "usd",
-
-                    product_data: {
-                        name: item.productName,
-                        description: `Sold by ${item.sellingUnit}`,
-                    },
-
-                    unit_amount: Math.round(item.unitPrice * 100),
-                },
-
-                quantity: item.quantity,
-            })),
-
-            client: {
-                id: user.id,
-                email: user.email,
-            },
-
-            metadata: {
-                orderId: order.id,
-                customerId: user.id,
-            },
-        });
-
-        return {
-            message: "Order created successfully",
-            orderId,
-            checkoutSessionUrl: checkoutSession.url,
-        };
-    }
-
     // async createOrder(user: UserPayload, payload: CreateOrderDto) {
     //     const shippingAddress =
     //         await this.prisma.shippingAddress.findUniqueOrThrow({
@@ -233,8 +69,11 @@ export class OrderService {
     //                     pricePerUnit: true,
     //                     pricingTiers: {
     //                         select: {
-    //                             pricePerUnit: true,
     //                             quantity: true,
+    //                             pricePerUnit: true,
+    //                         },
+    //                         orderBy: {
+    //                             quantity: "asc",
     //                         },
     //                     },
     //                 },
@@ -260,25 +99,32 @@ export class OrderService {
     //         );
     //     }
 
-    //     const items = carts.map((cart) => ({
-    //         productId: cart.product.id,
-    //         quantity: cart.quantity,
-    //         productName: cart.product.name,
-    //         sellingUnit: cart.product.sellingUnit,
-    //         unitPrice: cart.product.pricePerUnit as number,
-    //         subtotal: cart.quantity * (cart.product.pricePerUnit as number),
-    //     }));
+    //     const items = carts.map((cart) => {
+    //         const basePrice = cart.product.pricePerUnit as number;
+    //         const applicableTier = cart.product.pricingTiers
+    //             .filter((tier) => tier.quantity <= cart.quantity)
+    //             .sort((a, b) => b.quantity - a.quantity)[0];
+
+    //         const unitPrice = applicableTier
+    //             ? (applicableTier.pricePerUnit as number)
+    //             : basePrice;
+
+    //         const subtotal = cart.quantity * unitPrice;
+
+    //         return {
+    //             productId: cart.product.id,
+    //             quantity: cart.quantity,
+    //             productName: cart.product.name,
+    //             sellingUnit: cart.product.sellingUnit,
+    //             unitPrice,
+    //             subtotal,
+    //         };
+    //     });
 
     //     const totalAmount =
     //         Math.round(
     //             items.reduce((total, item) => total + item.subtotal, 0) * 100,
-    //         ) / 100;
-
-    //     const generateOrderId = () => {
-    //         const code = Math.floor(100000 + Math.random() * 900000);
-
-    //         return `AC-${code}`;
-    //     };
+    //         ) / 100;    
 
     //     const orderId = generateOrderId();
 
@@ -291,9 +137,15 @@ export class OrderService {
     //                 status: "Pending",
     //                 totalAmount,
     //                 paymentStatus: "Pending",
+
     //                 items: {
     //                     create: items.map((item) => ({
-    //                         ...item,
+    //                         productId: item.productId,
+    //                         productName: item.productName,
+    //                         sellingUnit: item.sellingUnit,
+    //                         quantity: item.quantity,
+    //                         unitPrice: item.unitPrice,
+    //                         subtotal: item.subtotal,
     //                         status: "Pending",
     //                     })),
     //                 },
@@ -307,18 +159,23 @@ export class OrderService {
     //         line_items: items.map((item) => ({
     //             price_data: {
     //                 currency: "usd",
+
     //                 product_data: {
     //                     name: item.productName,
     //                     description: `Sold by ${item.sellingUnit}`,
     //                 },
+
     //                 unit_amount: Math.round(item.unitPrice * 100),
     //             },
+
     //             quantity: item.quantity,
     //         })),
+
     //         client: {
     //             id: user.id,
     //             email: user.email,
     //         },
+
     //         metadata: {
     //             orderId: order.id,
     //             customerId: user.id,
@@ -331,6 +188,143 @@ export class OrderService {
     //         checkoutSessionUrl: checkoutSession.url,
     //     };
     // }
+
+    async createOrder(user: UserPayload, payload: CreateOrderDto) {
+        const shippingAddress =
+            await this.prisma.shippingAddress.findUniqueOrThrow({
+                where: {
+                    id: payload.shippingAddressId,
+                    userId: user.id,
+                },
+                select: {
+                    id: true,
+                },
+            });
+
+        const rawCartIds = payload.cartIds;
+
+        const cartIds = Array.isArray(rawCartIds)
+            ? Array.from(new Set(rawCartIds.filter(Boolean)))
+            : [];
+
+        if (cartIds.length === 0) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "At least one cart item is required to create an order",
+            );
+        }
+
+        const carts = await this.prisma.cart.findMany({
+            where: {
+                userId: user.id,
+                id: {
+                    in: cartIds,
+                },
+            },
+            select: {
+                id: true,
+                quantity: true,
+                product: {
+                    select: {
+                        id: true,
+                        name: true,
+                        sellingUnit: true,
+                        availableQuantity: true,
+                        pricePerUnit: true,
+                        pricingTiers: {
+                            select: {
+                                pricePerUnit: true,
+                                quantity: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (carts.length !== cartIds.length) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Some cart ids are invalid or do not belong to this user",
+            );
+        }
+
+        const unavailableCart = carts.find(
+            (cart) => cart.quantity > cart.product.availableQuantity,
+        );
+
+        if (unavailableCart) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                `Insufficient quantity available for ${unavailableCart.product.name}`,
+            );
+        }
+
+        const items = carts.map((cart) => ({
+            productId: cart.product.id,
+            quantity: cart.quantity,
+            productName: cart.product.name,
+            sellingUnit: cart.product.sellingUnit,
+            unitPrice: cart.product.pricePerUnit as number,
+            subtotal: cart.quantity * (cart.product.pricePerUnit as number),
+        }));
+
+        const totalAmount =
+            Math.round(
+                items.reduce((total, item) => total + item.subtotal, 0) * 100,
+            ) / 100;        
+
+        const orderId = generateOrderId();
+
+        const order = await this.prisma.$transaction(async (transaction) => {
+            const order = await transaction.order.create({
+                data: {
+                    orderId,
+                    customerId: user.id,
+                    shippingAddressId: shippingAddress.id,
+                    status: "Pending",
+                    totalAmount,
+                    paymentStatus: "Pending",
+                    items: {
+                        create: items.map((item) => ({
+                            ...item,
+                            status: "Pending",
+                        })),
+                    },
+                },
+            });
+
+            return order;
+        });
+
+        const checkoutSession = await this.stripe.createCheckoutSession({
+            line_items: items.map((item) => ({
+                price_data: {
+                    currency: "usd",
+                    product_data: {
+                        name: item.productName,
+                        description: `Sold by ${item.sellingUnit}`,
+                    },
+                    unit_amount: Math.round(item.unitPrice * 100),
+                },
+                quantity: item.quantity,
+            })),
+            client: {
+                id: user.id,
+                email: user.email,
+            },
+            metadata: {
+                orderId: order.id,
+                customerId: user.id,
+            },
+        });
+
+        return {
+            message: "Order created successfully",
+            orderId,
+            checkoutSessionUrl: checkoutSession.url,
+        };
+    }
 
     async getUserOrders(user: UserPayload, query?: OrderQueryDto) {
         const queryBuilder = new QueryBuilder(this.prisma.order, query);

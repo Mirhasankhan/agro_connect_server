@@ -114,9 +114,7 @@ export class ProductService {
                     type: "number",
                 },
             ])
-            .sortBy({
-                createdAt: "desc",
-            })
+            .sort()
             .paginate()
             .select({
                 id: true,
@@ -146,6 +144,61 @@ export class ProductService {
         };
     }
 
+    async getProductByProducer(user: UserPayload, query?: ProductQueryDto) {
+        const queryBuilder = new QueryBuilder(this.prisma.product, query);
+
+        const response = queryBuilder
+            .search(["name", "description"])
+            .rawFilter({
+                producerId: user.id,
+            })
+            .paginate()
+            .sort()
+            .select({
+                id: true,
+                imageUrls: true,
+                name: true,
+                pricePerUnit: true,
+                availableQuantity: true,
+                sellingUnit: true,
+                sold: true,
+                category: {
+                    select: {
+                        name: true,
+                    },
+                },
+            });
+
+        const status = query?.status;
+
+        if (status === "active") {
+            response.rawFilter({
+                availableQuantity: {
+                    gt: 0,
+                },
+            });
+        }
+
+        if (status === "outOfStock") {
+            response.rawFilter({
+                availableQuantity: 0,
+            });
+        }
+
+        const [products, pagination] = await Promise.all([
+            response.execute(),
+            response.countTotal(),
+        ]);
+
+        return {
+            message: "Products fetched successfully",
+            data: {
+                products,
+                meta: pagination,
+            },
+        };
+    }
+
     async getProductById(productId: string, user?: UserPayload) {
         const product = await this.prisma.product.findUniqueOrThrow({
             where: {
@@ -160,6 +213,13 @@ export class ProductService {
                 availableQuantity: true,
                 imageUrls: true,
                 avgRating: true,
+                createdAt: true,
+                isActive: true,
+                _count: {
+                    select: {
+                        orderItems: true,
+                    },
+                },
                 totalReviews: true,
                 category: {
                     select: {
@@ -194,9 +254,24 @@ export class ProductService {
             },
         });
 
+        const revenue = await this.prisma.orderItem.aggregate({
+            where: {
+                productId: product.id,
+                order: {
+                    status: "Delivered",
+                },
+            },
+            _sum: {
+                subtotal: true,
+            },
+        });
+
         return {
             message: "Product fetched successfully",
-            data: product,
+            data: {
+                product,
+                revenue: revenue._sum.subtotal ?? 0,
+            },
         };
     }
 
