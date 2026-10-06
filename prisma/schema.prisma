@@ -12,7 +12,6 @@ model User {
   fullName         String
   email            String         @unique
   password         String
-  phone            String?
   role             UserRole
   status           ActivityStatus @default(ACTIVE)
   deleted          Boolean        @default(false)
@@ -87,27 +86,30 @@ model ProducerProfile {
   userId String @unique @db.ObjectId
   user   User   @relation(fields: [userId], references: [id])
 
-  // Basic producer information
-  farmName     String?
+  phoneNumber  String
   producerType ProducerType
-  farmSize     String?
-  farmAddress  String?
-  businessName String?
 
-  // Location
-  address  String
-  district String
-  region   String
+  city    String
+  region  String
+  address String
 
-  // Production information
-  productionTypes String[]
+  farmName     String
+  farmSize     Float
+  farmLocation String
+  nidUrl       String
 
-  // Verification documents
+  companyName String?
+  rccmNo      String?
+  sirenNo     String?
 
-  nidUrl                     String
-  tradeLicense               String?
-  tinNumber                  String?
-  businessRegistrationNumber String?
+  //private file url
+  landCertificate String?
+  farmPhotoUrl    String?
+
+  //company file url
+  companyCertificate String?
+  rcmUrl             String?
+  taxUrl             String?
 
   // Verification
   verificationStatus VerificationStatus @default(Pending)
@@ -140,7 +142,7 @@ model DriverProfile {
   userId      String   @unique @db.ObjectId
   user        User     @relation(fields: [userId], references: [id])
   // Personal / identity information
-  nidUrl   String
+  nidUrl      String
   dateOfBirth DateTime
 
   // Driving information
@@ -183,8 +185,8 @@ model DriverEarning {
 }
 
 enum ProducerType {
-  Farm
-  Business
+  Private
+  Company
 }
 
 enum VerificationStatus {

@@ -635,8 +635,7 @@ export class AuthService {
             },
             select: {
                 id: true,
-                fullName: true,
-                phone: true,
+                fullName: true,               
                 profileImage: true,
             },
         });
@@ -652,8 +651,7 @@ export class AuthService {
                 id: user.id,
             },
             data: {
-                fullName: payload.fullName ?? userData.fullName,
-                phone: payload.phone ?? userData.phone,
+                fullName: payload.fullName ?? userData.fullName,              
                 profileImage: profileImage ?? userData.profileImage,
             },
         });

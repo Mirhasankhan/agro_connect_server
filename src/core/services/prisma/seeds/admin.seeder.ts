@@ -34,8 +34,7 @@ export class AdminSeeder implements ISeeder {
                 role: UserRole.ADMIN,
                 status: ActivityStatus.ACTIVE,              
                 deleted: false,
-                fullName :"Admin",
-                phone: "0000000000",                
+                fullName :"Admin",                           
             },
            
         });

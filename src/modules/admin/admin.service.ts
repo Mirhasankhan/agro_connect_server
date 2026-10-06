@@ -23,7 +23,7 @@ export class AdminService {
         const queryBuilder = new QueryBuilder(this.prisma.user, query);
 
         const response = queryBuilder
-            .search(["email", "fullName", "phone"])
+            .search(["email", "fullName"])
             .filter({
                 exacts: ["verificationStatus", "producerType"],
                 nestedFields: {
@@ -41,8 +41,7 @@ export class AdminService {
             .select({
                 fullName: true,
                 email: true,
-                profileImage: true,
-                phone: true,
+                profileImage: true,              
                 producerProfile: {
                     omit: {
                         updatedAt: true,
@@ -97,7 +96,7 @@ export class AdminService {
         const queryBuilder = new QueryBuilder(this.prisma.user, query);
 
         const response = queryBuilder
-            .search(["email", "fullName", "phone"])
+            .search(["email", "fullName"])
             .filter({
                 exacts: ["vehicleType", "verificationStatus"],
                 nestedFields: {
@@ -115,8 +114,7 @@ export class AdminService {
             .select({
                 fullName: true,
                 email: true,
-                profileImage: true,
-                phone: true,
+                profileImage: true,              
                 driverProfile: {
                     omit: {
                         updatedAt: true,

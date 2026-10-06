@@ -6,8 +6,7 @@ import {
     IsArray,
     IsEnum,
     IsNotEmpty,
-    IsDateString,
-    IsPhoneNumber,
+    IsDateString,   
 } from "class-validator";
 import { UserRole, ProducerType, DriverVehicleType } from "@prisma/client";
 
@@ -41,10 +40,7 @@ export class updateUserDto {
     @IsOptional()
     @IsString()
     fullName?: string;
-
-    @IsOptional()
-    @IsPhoneNumber()
-    phone?: string;
+   
 }
 
 export class LoginUserDto {
