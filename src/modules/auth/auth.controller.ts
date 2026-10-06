@@ -41,8 +41,7 @@ import { UserRole } from "@prisma/client";
 @Controller("auth")
 export class AuthController {
     constructor(private authService: AuthService) {}
-
-    @HttpCode(HttpStatus.CREATED)
+  
     @IsPublic()
     @Post("register")
     @ApiOperation({ summary: "Register User" })

@@ -144,8 +144,7 @@ export class CreateProducerProfileDto {
     tinNumber?: string;
 }
 
-export class CreateDriverProfileDto { 
-
+export class CreateDriverProfileDto {
     @IsDateString()
     dateOfBirth: string;
 
@@ -167,7 +166,7 @@ export class CreateDriverProfileDto {
     @IsString()
     @IsNotEmpty()
     vehicleColor: string;
-    
+
     @IsString()
     address: string;
 

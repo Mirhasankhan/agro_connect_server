@@ -24,7 +24,7 @@ export class PaymentController {
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
-            data: result.data,
+            data: result.data
         });
     }
 

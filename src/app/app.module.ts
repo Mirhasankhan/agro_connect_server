@@ -16,6 +16,7 @@ import { ShoppingModule } from "@/modules/shopping/shopping.module";
 import { OrderModule } from "@/modules/order/order.module";
 import { SocketModule } from "@/modules/socket/socket.module";
 import { PaymentModule } from "@/modules/payment/payment.module";
+import { FeedbackModule } from "@/modules/feedback/feedback.module";
 
 @Module({
     imports: [
@@ -45,6 +46,7 @@ import { PaymentModule } from "@/modules/payment/payment.module";
                 },
             ],
         }),
+        FeedbackModule,
         PaymentModule,
         SocketModule,
         AuthModule,
