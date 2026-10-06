@@ -8,6 +8,7 @@ import config from "@/config";
 import { emailBody, resetPasswordEmail } from "./auth.template";
 import {
     ChangePasswordDto,
+    CreateBuyerProfileDto,
     CreateDriverProfileDto,
     CreateProducerProfileDto,
     LoginUserDto,
@@ -537,10 +538,9 @@ export class AuthService {
             }
 
             if (companyCertificateFile) {
-                companyCertificate =
-                    await this.fileService.uploadToCloudinary(
-                        companyCertificateFile,
-                    );
+                companyCertificate = await this.fileService.uploadToCloudinary(
+                    companyCertificateFile,
+                );
             }
 
             if (rcmFile) {
@@ -592,7 +592,10 @@ export class AuthService {
         user: UserPayload,
         payload: CreateDriverProfileDto,
         files?: {
-            licenseUrl?: Express.Multer.File[];
+            drivingLicenseUrl?: Express.Multer.File[];
+            vehicleRegistrationUrl?: Express.Multer.File[];
+            insuranceUrl?: Express.Multer.File[];
+            policeClearanceUrl?: Express.Multer.File[];
             nidUrl?: Express.Multer.File[];
         },
     ) {
@@ -612,21 +615,41 @@ export class AuthService {
             );
         }
 
-        const licenseFile = files?.licenseUrl?.[0];
+        const drivingLicenseFile = files?.drivingLicenseUrl?.[0];
+        const vehicleRegistrationFile = files?.vehicleRegistrationUrl?.[0];
+        const insuranceFile = files?.insuranceUrl?.[0];
+        const policeClearanceFile = files?.policeClearanceUrl?.[0];
         const nidFile = files?.nidUrl?.[0];
 
-        if (!licenseFile || !nidFile) {
+        if (
+            !drivingLicenseFile ||
+            !vehicleRegistrationFile ||
+            !insuranceFile ||
+            !policeClearanceFile ||
+            !nidFile
+        ) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
-                "License and NID documents are required for Driver profile",
+                "NID, driving license, vehicle registration, insurance, and police clearance documents are required for Driver profile",
             );
         }
 
-        let licenseUrl: string | null = null;
-        let nidUrl: string | null = null;
+        let drivingLicenseUrl: string;
+        let vehicleRegistrationUrl: string;
+        let insuranceUrl: string;
+        let policeClearanceUrl: string;
+        let nidUrl: string;
 
         try {
-            licenseUrl = await this.fileService.uploadToCloudinary(licenseFile);
+            drivingLicenseUrl =
+                await this.fileService.uploadToCloudinary(drivingLicenseFile);
+            vehicleRegistrationUrl = await this.fileService.uploadToCloudinary(
+                vehicleRegistrationFile,
+            );
+            insuranceUrl =
+                await this.fileService.uploadToCloudinary(insuranceFile);
+            policeClearanceUrl =
+                await this.fileService.uploadToCloudinary(policeClearanceFile);
             nidUrl = await this.fileService.uploadToCloudinary(nidFile);
         } catch (error) {
             if (error instanceof ApiError) {
@@ -635,14 +658,17 @@ export class AuthService {
 
             throw new ApiError(
                 HttpStatus.BAD_GATEWAY,
-                "Producer document upload failed",
+                "Driver document upload failed",
             );
         }
 
         await this.prisma.driverProfile.create({
             data: {
                 userId: user.id,
-                licenseUrl,
+                drivingLicenseUrl,
+                vehicleRegistrationUrl,
+                insuranceUrl,
+                policeClearanceUrl,
                 nidUrl,
                 ...payload,
             },
@@ -662,6 +688,47 @@ export class AuthService {
         };
     }
 
+    async createBuyerProfile(
+        user: UserPayload,
+        payload: CreateBuyerProfileDto,
+    ) {
+        const existingProfile = await this.prisma.buyerProfile.findUnique({
+            where: {
+                userId: user.id,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (existingProfile) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Buyer profile already exists",
+            );
+        }
+
+        await this.prisma.buyerProfile.create({
+            data: {
+                userId: user.id,
+                ...payload,
+            },
+        });
+
+        await this.prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                isSetupCompleted: true,
+            },
+        });
+
+        return {
+            message: "Buyer profile created successfully",
+        };
+    }
+
     async updateProfile(
         user: UserPayload,
         payload: updateUserDto,
@@ -673,7 +740,7 @@ export class AuthService {
             },
             select: {
                 id: true,
-                fullName: true,               
+                fullName: true,
                 profileImage: true,
             },
         });
@@ -689,7 +756,7 @@ export class AuthService {
                 id: user.id,
             },
             data: {
-                fullName: payload.fullName ?? userData.fullName,              
+                fullName: payload.fullName ?? userData.fullName,
                 profileImage: profileImage ?? userData.profileImage,
             },
         });

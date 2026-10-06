@@ -37,6 +37,7 @@ model User {
   sentMessages      ChatMessage[]     @relation("MessageSender")
   receivedMessages  ChatMessage[]     @relation("MessageReceiver")
   reviews           Review[]
+  buyerProfile      BuyerProfile?
 
   @@map("users")
 }
@@ -138,26 +139,23 @@ model ProducerEarning {
 }
 
 model DriverProfile {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String   @unique @db.ObjectId
-  user        User     @relation(fields: [userId], references: [id])
+  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String            @unique @db.ObjectId
+  user               User              @relation(fields: [userId], references: [id])
   // Personal / identity information
-  nidUrl      String
-  dateOfBirth DateTime
+  phoneNumber        String
+  city               String
+  region             String
+  address            String
+  vehicleType        DriverVehicleType
+  registrationNumber String
 
-  // Driving information
-  drivingLicenseNumber String
-  licenseUrl           String
-
-  // Vehicle information
-  vehicleType         DriverVehicleType
-  vehicleRegistration String
-  vehicleModel        String
-  vehicleColor        String
-
-  // Location
-  address  String
-  district String
+  //driver urls
+  nidUrl                 String
+  drivingLicenseUrl      String
+  vehicleRegistrationUrl String
+  insuranceUrl           String
+  policeClearanceUrl     String
 
   // Verification
   verificationStatus VerificationStatus @default(Pending)
@@ -182,6 +180,22 @@ model DriverEarning {
 
   driver User  @relation(fields: [driverId], references: [id])
   order  Order @relation(fields: [orderId], references: [id])
+}
+
+model BuyerProfile {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String @unique @db.ObjectId
+  user         User   @relation(fields: [userId], references: [id])
+  // Personal / identity information
+  phoneNumber  String
+  city         String
+  region       String
+  address      String
+  profileType  String
+  institution  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum ProducerType {
@@ -258,6 +272,7 @@ model Product {
   sellingUnit       SellingUnit
   pricePerUnit      Float
   availableQuantity Int
+  sold              Int         @default(0)
 
   pricingTiers PricingTier[]
   isFeatured   Boolean       @default(false)

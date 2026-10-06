@@ -17,6 +17,7 @@ import { ResponseService } from "@/common/interceptors/response";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
     ChangePasswordDto,
+    CreateBuyerProfileDto,
     CreateDriverProfileDto,
     CreateProducerProfileDto,
     LoginUserDto,
@@ -41,7 +42,7 @@ import { UserRole } from "@prisma/client";
 @Controller("auth")
 export class AuthController {
     constructor(private authService: AuthService) {}
-  
+
     @IsPublic()
     @Post("register")
     @ApiOperation({ summary: "Register User" })
@@ -195,7 +196,10 @@ export class AuthController {
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
         CustomFileFieldsInterceptor([
-            { name: "licenseUrl", maxCount: 1 },
+            { name: "drivingLicenseUrl", maxCount: 1 },
+            { name: "vehicleRegistrationUrl", maxCount: 1 },
+            { name: "insuranceUrl", maxCount: 1 },
+            { name: "policeClearanceUrl", maxCount: 1 },
             { name: "nidUrl", maxCount: 1 },
         ]),
         ParseFormDataInterceptor,
@@ -206,7 +210,10 @@ export class AuthController {
         @Req() req: Request,
         @UploadedFiles()
         files?: {
-            licenseUrl?: Express.Multer.File[];
+            drivingLicenseUrl?: Express.Multer.File[];
+            vehicleRegistrationUrl?: Express.Multer.File[];
+            insuranceUrl?: Express.Multer.File[];
+            policeClearanceUrl?: Express.Multer.File[];
             nidUrl?: Express.Multer.File[];
         },
     ) {
@@ -216,6 +223,22 @@ export class AuthController {
             payload,
             files,
         );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+
+    @Post("create-buyer-profile")
+    @Roles(UserRole.BUYER)
+    @ApiOperation({ summary: "Create Buyer Profile" })
+    async createBuyerProfile(
+        @Body() payload: CreateBuyerProfileDto,
+        @Req() req: Request,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.createBuyerProfile(user, payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
