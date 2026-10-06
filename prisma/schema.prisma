@@ -92,6 +92,7 @@ model ProducerProfile {
   producerType ProducerType
   farmSize     String?
   farmAddress  String?
+  businessName String?
 
   // Location
   address  String
@@ -102,10 +103,11 @@ model ProducerProfile {
   productionTypes String[]
 
   // Verification documents
-  nidNumber    String?
-  nidUrl       String?
-  tradeLicense String?
-  tinNumber    String?
+
+  nidUrl                     String
+  tradeLicense               String?
+  tinNumber                  String?
+  businessRegistrationNumber String?
 
   // Verification
   verificationStatus VerificationStatus @default(Pending)
@@ -138,7 +140,7 @@ model DriverProfile {
   userId      String   @unique @db.ObjectId
   user        User     @relation(fields: [userId], references: [id])
   // Personal / identity information
-  nidNumber   String
+  nidUrl   String
   dateOfBirth DateTime
 
   // Driving information
@@ -152,7 +154,7 @@ model DriverProfile {
   vehicleColor        String
 
   // Location
-  address  String?
+  address  String
   district String
 
   // Verification
@@ -181,7 +183,6 @@ model DriverEarning {
 }
 
 enum ProducerType {
-  Individual
   Farm
   Business
 }

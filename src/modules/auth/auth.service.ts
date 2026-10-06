@@ -481,20 +481,13 @@ export class AuthService {
             );
         }
 
-        if (payload.producerType === "Individual" && !payload.nidNumber) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                "NID number is required for Individual type producer",
-            );
-        }
-
         const tradeLicenseFile = files?.tradeLicense?.[0];
         const nidFile = files?.nidUrl?.[0];
 
-        if (payload.producerType === "Individual" && !nidFile) {
+        if (!nidFile) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
-                "NID document is required for Individual type producer",
+                "NID document is required for Producer profile",
             );
         }
 
@@ -523,11 +516,14 @@ export class AuthService {
 
         if (
             payload.producerType === "Business" &&
-            (!tradeLicenseUrl || !payload.tinNumber)
+            (!tradeLicenseUrl ||
+                !payload.tinNumber ||
+                !payload.businessRegistrationNumber ||
+                !payload.businessName)
         ) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
-                "Trade license and TIN number are required for Business type producer",
+                "Trade license, TIN number, business registration number, and business name are required for Business type producer",
             );
         }
 
@@ -557,7 +553,10 @@ export class AuthService {
     async createDriverProfile(
         user: UserPayload,
         payload: CreateDriverProfileDto,
-        file?: Express.Multer.File,
+        files?: {
+            licenseUrl?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
     ) {
         const existingProfile = await this.prisma.driverProfile.findUnique({
             where: {
@@ -575,16 +574,30 @@ export class AuthService {
             );
         }
 
-        let licenseUrl = null;
+        const licenseFile = files?.licenseUrl?.[0];
+        const nidFile = files?.nidUrl?.[0];
 
-        if (file) {
-            licenseUrl = await this.fileService.uploadToCloudinary(file);
-        }
-
-        if (!licenseUrl) {
+        if (!licenseFile || !nidFile) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
-                "License is required for Driver",
+                "License and NID documents are required for Driver profile",
+            );
+        }
+
+        let licenseUrl: string | null = null;
+        let nidUrl: string | null = null;
+
+        try {
+            licenseUrl = await this.fileService.uploadToCloudinary(licenseFile);
+            nidUrl = await this.fileService.uploadToCloudinary(nidFile);
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+
+            throw new ApiError(
+                HttpStatus.BAD_GATEWAY,
+                "Producer document upload failed",
             );
         }
 
@@ -592,6 +605,7 @@ export class AuthService {
             data: {
                 userId: user.id,
                 licenseUrl,
+                nidUrl,
                 ...payload,
             },
         });
@@ -606,7 +620,7 @@ export class AuthService {
         });
 
         return {
-            message: "Profile updated successfully",
+            message: "Driver profile created successfully",
         };
     }
 

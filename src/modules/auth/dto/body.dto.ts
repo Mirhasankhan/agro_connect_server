@@ -133,17 +133,18 @@ export class CreateProducerProfileDto {
 
     @IsOptional()
     @IsString()
-    nidNumber?: string;
+    businessRegistrationNumber?: string;
+
+    @IsOptional()
+    @IsString()
+    businessName?: string;
 
     @IsOptional()
     @IsString()
     tinNumber?: string;
 }
 
-export class CreateDriverProfileDto {
-    @IsString()
-    @IsNotEmpty()
-    nidNumber: string;
+export class CreateDriverProfileDto { 
 
     @IsDateString()
     dateOfBirth: string;
@@ -166,10 +167,9 @@ export class CreateDriverProfileDto {
     @IsString()
     @IsNotEmpty()
     vehicleColor: string;
-
-    @IsOptional()
+    
     @IsString()
-    address?: string;
+    address: string;
 
     @IsString()
     @IsNotEmpty()

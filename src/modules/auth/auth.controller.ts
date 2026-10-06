@@ -187,20 +187,27 @@ export class AuthController {
     @Post("create-driver-profile")
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
-        CustomFileInterceptor("licenseUrl"),
+        CustomFileFieldsInterceptor([
+            { name: "licenseUrl", maxCount: 1 },
+            { name: "nidUrl", maxCount: 1 },
+        ]),
         ParseFormDataInterceptor,
     )
     @ApiOperation({ summary: "Create Driver Profile" })
     async createDriverProfile(
         @Body() payload: CreateDriverProfileDto,
         @Req() req: Request,
-        @UploadedFile() file?: Express.Multer.File,
+        @UploadedFiles()
+        files?: {
+            licenseUrl?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
     ) {
         const user = req.user as UserPayload;
         const result = await this.authService.createDriverProfile(
             user,
             payload,
-            file,
+            files,
         );
 
         return ResponseService.formatResponse({
