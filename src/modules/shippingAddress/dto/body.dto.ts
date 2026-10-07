@@ -8,10 +8,7 @@ export class ShippingAddressDto {
     city: string;
 
     @IsString()
-    postCode: string;
-
-    @IsString()
-    country: string;
+    postCode: string;   
 
     @IsString()
     instruction: string;

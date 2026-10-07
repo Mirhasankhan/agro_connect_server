@@ -39,7 +39,7 @@ export class ShippingAddressController {
     @Roles(UserRole.BUYER)
     @ApiOperation({ summary: "Get Shipping Address" })
     async getShippingAddresses(@Req() req: Request) {
-        const result = await this.shippingAddressService.getShippingAddress(req.user as UserPayload, req.query);
+        const result = await this.shippingAddressService.getShippingAddress(req.user as UserPayload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,

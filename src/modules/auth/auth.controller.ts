@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Get,
     HttpCode,
     HttpStatus,
     Post,
@@ -268,6 +269,20 @@ export class AuthController {
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
+        });
+    }
+
+    @Get("profile")
+    @Roles(UserRole.DRIVER, UserRole.PRODUCER, UserRole.BUYER)
+    @ApiOperation({ summary: "Get user Profile" })
+    async getUserProfile(@Req() req: Request) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.getUserProfile(user);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
         });
     }
 }

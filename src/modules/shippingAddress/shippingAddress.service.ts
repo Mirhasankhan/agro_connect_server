@@ -1,8 +1,8 @@
 import { PrismaService } from "@/core/services/prisma/prisma.service";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ShippingAddressDto } from "./dto/body.dto";
 import { UserPayload } from "@/common/guards/auth.guard";
-import QueryBuilder from "@/common/utils/queryBuilder";
+
 
 @Injectable()
 export class ShippingAddressService {
@@ -12,14 +12,13 @@ export class ShippingAddressService {
         payload: ShippingAddressDto,
         user: UserPayload,
     ) {
-        const { addressLine, city, country, instruction, postCode } = payload;
+        const { addressLine, city, instruction, postCode } = payload;
 
         await this.prisma.shippingAddress.create({
             data: {
                 userId: user.id,
                 addressLine,
-                city,
-                country,
+                city,             
                 instruction,
                 postCode,
             },
@@ -29,7 +28,7 @@ export class ShippingAddressService {
         };
     }
 
-    async getShippingAddress(user: UserPayload, query: any) {
+    async getShippingAddress(user: UserPayload) {
 
         const shippingAddresses = await this.prisma.shippingAddress.findMany({
             where: {
@@ -38,8 +37,7 @@ export class ShippingAddressService {
             select: {
                 id: true,
                 addressLine: true,
-                city: true,
-                country: true,
+                city: true,              
                 instruction: true,
                 postCode: true,
             }

@@ -122,6 +122,19 @@ export class ProductService {
                 pricePerUnit: true,
                 imageUrls: true,
                 availableQuantity: true,
+                avgRating: true,
+                totalReviews: true,
+                producer: {
+                    select: {
+                        producerProfile: {
+                            select: {
+                                farmName: true,
+                                companyName: true,
+                                city: true,
+                            },
+                        },
+                    },
+                },
                 wishlists: user?.id
                     ? {
                           where: { userId: user.id },

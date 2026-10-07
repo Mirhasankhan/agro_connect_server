@@ -124,7 +124,7 @@ export class OrderService {
     //     const totalAmount =
     //         Math.round(
     //             items.reduce((total, item) => total + item.subtotal, 0) * 100,
-    //         ) / 100;    
+    //         ) / 100;
 
     //     const orderId = generateOrderId();
 
@@ -272,7 +272,7 @@ export class OrderService {
         const totalAmount =
             Math.round(
                 items.reduce((total, item) => total + item.subtotal, 0) * 100,
-            ) / 100;        
+            ) / 100;
 
         const orderId = generateOrderId();
 
@@ -394,10 +394,39 @@ export class OrderService {
                 product: {
                     producerId: user.id,
                 },
+                order: {
+                    paymentStatus: "Paid",
+                },
             })
             .select({
                 id: true,
                 productName: true,
+                createdAt: true,
+                sellingUnit: true,
+                quantity: true,
+                subtotal: true,
+                unitPrice: true,
+                product: {
+                    select: {
+                        imageUrls: true,
+                    },
+                },
+                order: {
+                    select: {
+                        orderId: true,
+                        customer: {
+                            select: {
+                                fullName: true,
+                                profileImage: true,
+                                buyerProfile: {
+                                    select: {
+                                        institution: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
             });
 
         const [orderItems, pagination] = await Promise.all([
@@ -429,8 +458,7 @@ export class OrderService {
                 cancelReason: true,
                 shippingAddress: {
                     select: {
-                        addressLine: true,
-                        country: true,
+                        addressLine: true,                    
                         city: true,
                         instruction: true,
                         postCode: true,

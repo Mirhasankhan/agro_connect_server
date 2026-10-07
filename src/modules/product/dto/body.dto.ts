@@ -87,7 +87,7 @@ export class ProductQueryDto {
     maxPrice?: string;
 
     @IsOptional()
-    @IsIn(["pricePerUnit", "availableQuantity"])
+    @IsIn(["pricePerUnit", "availableQuantity", "avgRating", "createdAt"])
     sort?: string;
 
     @IsOptional()

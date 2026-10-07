@@ -761,8 +761,102 @@ export class AuthService {
             },
         });
 
+        const profileUpdateData = {
+            ...(payload.phoneNumber !== undefined && {
+                phoneNumber: payload.phoneNumber,
+            }),
+            ...(payload.city !== undefined && { city: payload.city }),
+            ...(payload.region !== undefined && { region: payload.region }),
+            ...(payload.address !== undefined && { address: payload.address }),
+        };
+
+        if (user.role === "DRIVER") {
+            await this.prisma.driverProfile.update({
+                where: {
+                    userId: user.id,
+                },
+                data: profileUpdateData,
+            });
+        }
+
+        if (user.role === "PRODUCER") {
+            await this.prisma.producerProfile.update({
+                where: {
+                    userId: user.id,
+                },
+                data: profileUpdateData,
+            });
+        }
+
+        if (user.role === "BUYER") {
+            await this.prisma.buyerProfile.update({
+                where: {
+                    userId: user.id,
+                },
+                data: profileUpdateData,
+            });
+        }
+
         return {
             message: "Profile updated successfully",
+        };
+    }
+
+    async getUserProfile(user: UserPayload) {
+        const userData = await this.prisma.user.findUniqueOrThrow({
+            where: {
+                id: user.id,
+            },
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                profileImage: true,
+                role: true,
+                status: true,
+                driverProfile:
+                    user.role === "DRIVER"
+                        ? {
+                              select: {
+                                  verificationStatus: true,
+                                  phoneNumber: true,
+                                  address: true,
+                                  city: true,
+                                  region: true,
+                              },
+                          }
+                        : false,
+                producerProfile:
+                    user.role === "PRODUCER"
+                        ? {
+                              select: {
+                                  verificationStatus: true,
+                                  phoneNumber: true,
+                                  address: true,
+                                  city: true,
+                                  region: true,
+                              },
+                          }
+                        : false,
+                buyerProfile:
+                    user.role === "BUYER"
+                        ? {
+                              select: {
+                                  phoneNumber: true,
+                                  address: true,
+                                  city: true,
+                                  region: true,
+                                  institution: true,
+                                  profileType: true,
+                              },
+                          }
+                        : false,
+            },
+        });
+
+        return {
+            message: "User profile fetched successfully",
+            data: userData,
         };
     }
 }

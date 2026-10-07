@@ -6,6 +6,7 @@ import {
     IsEnum,
     IsNotEmpty,
     IsNumber,
+    IsPhoneNumber,
 } from "class-validator";
 import { UserRole, ProducerType, DriverVehicleType } from "@prisma/client";
 
@@ -39,6 +40,22 @@ export class updateUserDto {
     @IsOptional()
     @IsString()
     fullName?: string;
+
+    @IsOptional()
+    @IsPhoneNumber()
+    phoneNumber?: string;
+
+    @IsOptional()
+    @IsString()
+    city?: string;
+
+    @IsOptional()
+    @IsString()
+    region?: string;
+
+    @IsOptional()
+    @IsString()
+    address?: string;
 }
 
 export class LoginUserDto {

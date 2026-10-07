@@ -234,8 +234,7 @@ model ShippingAddress {
   userId      String   @db.ObjectId
   addressLine String
   city        String
-  postCode    String
-  country     String
+  postCode    String  
   instruction String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
