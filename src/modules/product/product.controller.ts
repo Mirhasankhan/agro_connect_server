@@ -18,7 +18,6 @@ import { UserRole } from "@prisma/client";
 import { CustomFilesInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
 import {
-    PricingTierDto,
     ProductDto,
     ProductQueryDto,
     UpdateProductDto,
@@ -104,24 +103,7 @@ export class ProductController {
         });
     }
 
-    @Post("add-pricing-tier")
-    @Roles(UserRole.PRODUCER)
-    @ApiOperation({ summary: "Add new pricing tier for a product" })
-    async addNewPricingTier(
-        @Req() req: Request,
-        @Body() payload: PricingTierDto,
-    ) {
-        const user = req.user as UserPayload;
-        const result = await this.productService.addNewPricingTier(
-            user,
-            payload,
-        );
 
-        return ResponseService.formatResponse({
-            statusCode: HttpStatus.OK,
-            message: result.message,
-        });
-    }
 
     @Put("update")
     @Roles(UserRole.PRODUCER)

@@ -6,27 +6,13 @@ import {
     IsNotEmpty,
     IsString,
     Min,
-    IsOptional,
-    ValidateNested,
+    IsOptional,    
     IsBoolean,
     IsIn,
 } from "class-validator";
-import { Type } from "class-transformer";
 import { SellingUnit } from "@prisma/client";
 
-export class PricingTierDto {
-    @IsOptional()
-    @IsMongoId()
-    productId?: string;
 
-    @IsInt()
-    @Min(2)
-    quantity: number;
-
-    @IsInt()
-    @Min(1)
-    pricePerUnit: number;
-}
 
 export class ProductDto {
     @IsString()
@@ -54,11 +40,7 @@ export class ProductDto {
     @Min(1)
     availableQuantity: number;
 
-    @IsOptional()
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => PricingTierDto)
-    pricingTiers: PricingTierDto[];
+    
 }
 
 export class ProductQueryDto {

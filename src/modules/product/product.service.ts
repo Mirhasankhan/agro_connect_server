@@ -1,8 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { UserPayload } from "@/common/guards/auth.guard";
-import {
-    PricingTierDto,
+import {    
     ProductDto,
     ProductQueryDto,
     UpdateProductDto,
@@ -62,26 +61,18 @@ export class ProductService {
             );
         }
 
-        const { pricingTiers, ...productData } = payload;
+        
 
         await this.prisma.$transaction(async (tx) => {
-            const product = await tx.product.create({
+             await tx.product.create({
                 data: {
-                    ...productData,
+                    ...payload,
                     producerId: user.id,
                     imageUrls,
                 },
             });
 
-            if (pricingTiers?.length) {
-                await tx.pricingTier.createMany({
-                    data: pricingTiers.map((tier) => ({
-                        productId: product.id,
-                        quantity: tier.quantity,
-                        pricePerUnit: tier.pricePerUnit,
-                    })),
-                });
-            }
+   
         });
 
         return {
@@ -233,16 +224,24 @@ export class ProductService {
                         orderItems: true,
                     },
                 },
+                producer: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        profileImage: true,
+                        producerProfile: {
+                            select: {
+                                farmName: true,
+                                address: true,
+                                companyName: true,
+                            },
+                        },
+                    },
+                },
                 totalReviews: true,
                 category: {
                     select: {
                         name: true,
-                    },
-                },
-                pricingTiers: {
-                    select: {
-                        pricePerUnit: true,
-                        quantity: true,
                     },
                 },
                 reviews: {
@@ -287,46 +286,7 @@ export class ProductService {
             },
         };
     }
-
-    async addNewPricingTier(user: UserPayload, payload: PricingTierDto) {
-        const product = await this.prisma.product.findUniqueOrThrow({
-            where: {
-                id: payload.productId,
-                producerId: user.id,
-            },
-            select: {
-                id: true,
-                pricingTiers: {
-                    select: {
-                        quantity: true,
-                    },
-                },
-            },
-        });
-
-        const tierAlreadyExists = product.pricingTiers.some(
-            (tier) => tier.quantity === payload.quantity,
-        );
-
-        if (tierAlreadyExists) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                "A pricing tier with this quantity already exists",
-            );
-        }
-
-        await this.prisma.pricingTier.create({
-            data: {
-                productId: payload.productId,
-                quantity: payload.quantity,
-                pricePerUnit: payload.pricePerUnit,
-            },
-        });
-
-        return {
-            message: "Pricing tier added successfully",
-        };
-    }
+   
 
     async updateProduct(user: UserPayload, payload: UpdateProductDto) {
         const product = await this.prisma.product.findUniqueOrThrow({
@@ -431,6 +391,22 @@ export class ProductService {
 
         return {
             message: "Product images updated successfully",
+        };
+    }
+
+    async getProducerInfo(producerId: string) {
+        const producer = await this.prisma.user.findUniqueOrThrow({
+            where: { id: producerId },
+            select: {
+                id: true,
+            },
+        });
+
+        return {
+            message: "Producer info fetched successfully",
+            data: {
+                producer,
+            },
         };
     }
 }
