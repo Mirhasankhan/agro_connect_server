@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { UserPayload } from "@/common/guards/auth.guard";
-import {    
+import {
     ProductDto,
     ProductQueryDto,
     UpdateProductDto,
@@ -61,18 +61,14 @@ export class ProductService {
             );
         }
 
-        
-
         await this.prisma.$transaction(async (tx) => {
-             await tx.product.create({
+            await tx.product.create({
                 data: {
                     ...payload,
                     producerId: user.id,
                     imageUrls,
                 },
             });
-
-   
         });
 
         return {
@@ -153,6 +149,9 @@ export class ProductService {
 
         const response = queryBuilder
             .search(["name", "description"])
+            .filter({
+                booleans: ["isActive"],
+            })
             .rawFilter({
                 producerId: user.id,
             })
@@ -172,22 +171,6 @@ export class ProductService {
                     },
                 },
             });
-
-        const status = query?.status;
-
-        if (status === "active") {
-            response.rawFilter({
-                availableQuantity: {
-                    gt: 0,
-                },
-            });
-        }
-
-        if (status === "outOfStock") {
-            response.rawFilter({
-                availableQuantity: 0,
-            });
-        }
 
         const [products, pagination] = await Promise.all([
             response.execute(),
@@ -286,7 +269,6 @@ export class ProductService {
             },
         };
     }
-   
 
     async updateProduct(user: UserPayload, payload: UpdateProductDto) {
         const product = await this.prisma.product.findUniqueOrThrow({

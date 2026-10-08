@@ -6,7 +6,7 @@ import {
     IsNotEmpty,
     IsString,
     Min,
-    IsOptional,    
+    IsOptional,
     IsBoolean,
     IsIn,
 } from "class-validator";
@@ -41,8 +41,6 @@ export class ProductDto {
     @IsInt()
     @Min(1)
     availableQuantity: number;
-
-    
 }
 
 export class ProductQueryDto {
@@ -59,8 +57,8 @@ export class ProductQueryDto {
     sellingUnit?: SellingUnit;
 
     @IsOptional()
-    @IsIn(["active", "outOfStock"])
-    status?: string;
+    @IsIn(["true", "false"])
+    isActive?: string;
 
     @IsOptional()
     @IsString()
