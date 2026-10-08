@@ -88,7 +88,7 @@ export class ShoppingController {
     @Roles(UserRole.BUYER)
     @ApiOperation({ summary: "Add Product to Wishlist" })
     async addProductToWishlist(@Param("id") id: string, @Req() req: Request) {
-        const result = await this.shoppingService.addProductToWishlist(
+        const result = await this.shoppingService.addRemoveProductToWishlist(
             req.user as UserPayload,
             id,
         );
@@ -112,20 +112,5 @@ export class ShoppingController {
         });
     }
 
-    @Delete("remove-wishlist/:id")
-    @Roles(UserRole.BUYER)
-    @ApiOperation({ summary: "Remove Product from Wishlist" })
-    async removeProductFromWishlist(
-        @Req() req: Request,
-        @Param("id") id: string,
-    ) {
-        const result = await this.shoppingService.removeProductFromWishlist(
-            req.user as UserPayload,
-            id,
-        );
-        return ResponseService.formatResponse({
-            statusCode: HttpStatus.OK,
-            message: result.message,
-        });
-    }
+    
 }

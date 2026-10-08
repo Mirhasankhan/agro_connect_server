@@ -83,7 +83,7 @@ export class ShoppingService {
                         id: true,
                         name: true,
                         pricePerUnit: true,
-                        imageUrls: true,                       
+                        imageUrls: true,
                     },
                 },
             },
@@ -182,7 +182,7 @@ export class ShoppingService {
 
     //wishlist related methods will be added here in future
 
-    async addProductToWishlist(user: UserPayload, productId: string) {
+    async addRemoveProductToWishlist(user: UserPayload, productId: string) {
         await this.prisma.product.findUniqueOrThrow({
             where: {
                 id: productId,
@@ -205,10 +205,15 @@ export class ShoppingService {
         });
 
         if (existingWishlist) {
-            throw new ApiError(
-                HttpStatus.BAD_REQUEST,
-                "Product is already in your wishlist",
-            );
+            await this.prisma.wishlist.delete({
+                where: {
+                    id: existingWishlist.id,
+                },
+            });
+
+            return {
+                message: "Product removed from wishlist successfully",
+            };
         }
 
         await this.prisma.wishlist.create({
@@ -235,7 +240,7 @@ export class ShoppingService {
                         id: true,
                         name: true,
                         pricePerUnit: true,
-                        imageUrls: true,                       
+                        imageUrls: true,
                     },
                 },
             },
@@ -244,19 +249,6 @@ export class ShoppingService {
         return {
             message: "Wishlist items retrieved successfully",
             data: wishlistItems,
-        };
-    }
-
-    async removeProductFromWishlist(user: UserPayload, wishlistId: string) {
-        await this.prisma.wishlist.delete({
-            where: {
-                id: wishlistId,
-                userId: user.id,
-            },
-        });
-
-        return {
-            message: "Product removed from wishlist successfully",
         };
     }
 }
