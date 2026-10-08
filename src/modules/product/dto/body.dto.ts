@@ -30,6 +30,10 @@ export class ProductDto {
     @IsBoolean()
     isFeatured?: boolean;
 
+    @IsOptional()
+    @IsBoolean()
+    isActive?: boolean;
+
     @IsInt()
     @Min(1)
     pricePerUnit: number;
