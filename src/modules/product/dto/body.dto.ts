@@ -12,8 +12,6 @@ import {
 } from "class-validator";
 import { SellingUnit } from "@prisma/client";
 
-
-
 export class ProductDto {
     @IsString()
     name: string;
