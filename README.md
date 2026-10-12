@@ -36,11 +36,11 @@ Agro Connect bridges agricultural producers (individual farmers, commercial farm
 - **Cart & Wishlist Engine**:
     - Stock validation prevents adding more than available quantities.
     - Increment/decrement operations with live inventory limits.
-- **Order Management & Stripe Checkout**:
-    - Checkout session creation via Stripe API.
-    - Secure webhook processing (`/api/v1/webhook/stripe`) for `checkout.session.completed`, `async_payment_succeeded`, and failed/expired sessions.
-    - Atomic Prisma transactions to decrement inventory and clear cart items upon payment.
-    - Automatic payment refund fallback via Stripe if order processing fails after charge.
+- **Order Management & CinetPay Hosted Checkout**:
+    - Checkout session creation via CinetPay API returning hosted payment URL.
+    - Secure server-to-server webhook / notification processing (`/api/v1/webhook/cinetpay`) with verification against CinetPay `/payment/check`.
+    - Support for African mobile money (MTN Mobile Money, Orange Money, Wave, Moov Africa) and cards.
+    - Atomic Prisma transactions to decrement inventory and clear cart items upon verified payment.
 - **Cloud Media Uploads**: Integrated with **Cloudinary** for product gallery photos, category thumbnails, and verification document storage.
 - **Dynamic QueryBuilder**: Reusable utility supporting deep search, exact & nested filtering, sorting, pagination, and total count metadata.
 - **Rate Limiting & Security**: Pre-configured with `@nestjs/throttler` (short, medium, long tiers), `helmet`, `cookie-parser`, and global exception filters.
@@ -66,13 +66,13 @@ Agro Connect bridges agricultural producers (individual farmers, commercial farm
          ├► Browse Products ├► Onboard Profile   ├► Onboard Profile ├► Approve Producers
          ├► Manage Cart     ├► Add Products      ├► Vehicle Details ├► Approve Drivers
          ├► Wishlist        ├► Tiered Pricing    ├► Delivery State  ├► Manage Categories
-         ├► Stripe Checkout ├► Track Orders      └──────────────────┘ └► Platform Audit
-         └► Order History   └───────────────────┘
+         ├► CinetPay Checkout ├► Track Orders      └──────────────────┘ └► Platform Audit
+         └► Order History     └───────────────────┘
 ```
 
 | Role           | Key Capabilities                                                                                                                                                      |
 | :------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`BUYER`**    | Search/filter catalog, add items to cart, manage wishlists, maintain shipping addresses, place orders via Stripe Checkout, review purchases.                          |
+| **`BUYER`**    | Search/filter catalog, add items to cart, manage wishlists, maintain shipping addresses, place orders via CinetPay Hosted Checkout, review purchases.                 |
 | **`PRODUCER`** | Complete profile onboarding (Individual, Farm, Business), upload Trade License/NID, publish products with selling units and bulk pricing tiers, view received orders. |
 | **`DRIVER`**   | Onboard with vehicle type (Bike, Motorcycle, Three Wheeler, Van, Truck, Pickup), driving license verification, toggle delivery availability.                          |
 | **`ADMIN`**    | Review and accept/reject producer and driver applications, create and toggle product categories, audit system activity.                                               |
@@ -85,7 +85,7 @@ Agro Connect bridges agricultural producers (individual farmers, commercial farm
 - **Runtime**: [Node.js](https://nodejs.org/) (Express platform)
 - **Language**: [TypeScript](https://www.typescriptlang.org/) v5.9
 - **Database & ORM**: [MongoDB](https://www.mongodb.com/) with [Prisma ORM](https://www.prisma.io/) v6
-- **Payments**: [Stripe](https://stripe.com/) Node SDK v18
+- **Payments**: [CinetPay](https://cinetpay.com/) Hosted Checkout API v2
 - **Authentication**: JWT (`@nestjs/jwt`), Passport, Bcrypt
 - **Cloud Storage**: [Cloudinary](https://cloudinary.com/), [AWS S3](https://aws.amazon.com/s3/)
 - **Email Providers**: Nodemailer (SMTP), [SendGrid](https://sendgrid.com/), [Resend](https://resend.com/), [Brevo](https://brevo.com/)
@@ -122,12 +122,12 @@ agro_connect_backend/
 │   │   │   ├── email/                 # Modular email senders (Nodemailer, Sendgrid, Resend, Brevo)
 │   │   │   ├── files/                 # Cloudinary & file handling services
 │   │   │   ├── prisma/                # Prisma client service & modular seeders
-│   │   │   └── stripe/                # Stripe checkout, webhook, and refund service
+│   │   │   └── cinetpay/              # CinetPay hosted checkout and verification service
 │   │   └── strategies/                # Passport authentication strategies
 │   ├── modules/
 │   │   ├── admin/                     # Admin verification & category management
 │   │   ├── auth/                      # Registration, OTPs, login, token refresh, onboarding
-│   │   ├── order/                     # Order creation, queries, and Stripe webhooks
+│   │   ├── order/                     # Order creation, queries, and CinetPay webhooks
 │   │   ├── product/                   # Product catalog & volume pricing tiers
 │   │   ├── shippingAddress/           # Buyer shipping addresses
 │   │   ├── shopping/                  # Shopping cart & wishlist operations
@@ -206,11 +206,10 @@ All routes are prefixed with `/api/v1`.
 
 | Method | Endpoint               | Access   | Description                                                                 |
 | :----- | :--------------------- | :------- | :-------------------------------------------------------------------------- |
-| `POST` | `/order/create`        | Buyer    | Create order from cart items and receive Stripe checkout URL                |
-| `GET`  | `/order/user-wise`     | Buyer    | Fetch buyer's order history with status and items                           |
-| `GET`  | `/order/producer-wise` | Producer | Fetch orders containing items sold by the logged-in producer                |
-| `GET`  | `/order/details/:id`   | Buyer    | Detailed order receipt with shipping & producer information                 |
-| `POST` | `/webhook/stripe`      | Public   | Stripe webhook endpoint handling payments, inventory decrement, and refunds |
+| `POST` | `/order/create`             | Buyer    | Create order from cart items and receive CinetPay checkout URL                 |
+| `POST` | `/order/checkout/:orderId`  | Buyer    | Initiate CinetPay checkout URL for existing pending order                      |
+| `POST` | `/order/verify/:txId`       | Buyer    | Verify order payment status server-to-server with CinetPay                      |
+| `POST` | `/webhook/cinetpay`         | Public   | CinetPay notification/webhook endpoint verifying payments and updating orders |
 
 ---
 
@@ -236,7 +235,7 @@ User ────────────┬─── ProducerProfile
 - **`Product`**: Title, description, multiple gallery URLs, selling unit (`KG`, `GRAM`, `PIECE`, `DOZEN`, `LITER`, `BAG`, `BUNDLE`), price per unit, available quantity, rating, and status.
 - **`PricingTier`**: Bulk quantity threshold and discounted price per unit.
 - **`Cart` & `Wishlist`**: User-product associations with quantity constraints.
-- **`Order` & `OrderItem`**: Unique order code (`AC-XXXXXX`), customer, shipping address, total amount, order status, Stripe payment intent ID, and per-item statuses.
+- **`Order` & `OrderItem`**: Unique order code (`AC-XXXXXX`), customer, shipping address, total amount, order status, CinetPay transaction ID, and per-item statuses.
 
 ---
 
@@ -264,15 +263,20 @@ cp .env.example .env
 | `SMTP_HOST` / `SMTP_PORT`  | SMTP mail server credentials                    | `smtp.gmail.com` / `587`                                |
 | `SMTP_USER` / `SMTP_PASS`  | SMTP username and password/app password         | `your_email@gmail.com`                                  |
 | `SENDER_EMAIL`             | Default sender email address                    | `no-reply@agroconnect.com`                              |
-| `STRIPE_SECRET_KEY`        | Stripe secret API key                           | `sk_test_...`                                           |
-| `STRIPE_WEBHOOK_SECRET`    | Stripe webhook signing secret                   | `whsec_...`                                             |
+| `CINETPAY_API_KEY`         | CinetPay API key                                | `<your-api-key>`                                        |
+| `CINETPAY_SITE_ID`         | CinetPay Site ID                                | `<your-site-id>`                                        |
+| `CINETPAY_API_URL`         | CinetPay payment API base URL                   | `https://api-checkout.cinetpay.com/v2/payment`          |
+| `CINETPAY_NOTIFY_URL`      | Webhook notification URL                        | `http://localhost:5000/api/v1/webhook/cinetpay`          |
+| `CINETPAY_RETURN_URL`      | Redirect URL after checkout                     | `http://localhost:3000/payment/success`                 |
+| `CINETPAY_CURRENCY`        | Currency code for transactions                  | `XOF`                                                   |
+| `CINETPAY_CHANNELS`        | Enabled payment channels (`ALL`, etc.)          | `ALL`                                                   |
 | `CLOUDINARY_CLOUD_NAME`    | Cloudinary account cloud name                   | `your_cloud_name`                                       |
 | `CLOUDINARY_API_KEY`       | Cloudinary API key                              | `your_api_key`                                          |
 | `CLOUDINARY_API_SECRET`    | Cloudinary API secret                           | `your_api_secret`                                       |
 | `FRONTEND_URL`             | Frontend application client origin              | `http://localhost:3000`                                 |
 | `BACKEND_URL`              | Backend server URL                              | `http://localhost:5000`                                 |
-| `PAYMENT_SUCCESS_URL`      | Redirect URL after successful Stripe payment    | `http://localhost:3000/payment/success`                 |
-| `PAYMENT_FAILED_URL`       | Redirect URL after cancelled Stripe payment     | `http://localhost:3000/payment/failed`                  |
+| `PAYMENT_SUCCESS_URL`      | Redirect URL after successful payment           | `http://localhost:3000/payment/success`                 |
+| `PAYMENT_FAILED_URL`       | Redirect URL after cancelled payment            | `http://localhost:3000/payment/failed`                  |
 
 > [!IMPORTANT]
 > MongoDB must be run with a **replica set** enabled (e.g. `?replicaSet=rs0`) because Prisma uses transactions for multi-record operations like orders and inventory adjustments.

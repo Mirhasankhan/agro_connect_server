@@ -17,7 +17,12 @@ import { ResponseService } from "@/common/interceptors/response";
 import { Roles } from "@/common/decorators/roles.decorator";
 import { UserRole } from "@prisma/client";
 import { OrderService } from "./order.service";
-import { ConfirmDeliveryDto, CreateOrderDto, DeliveryDto, OrderQueryDto } from "./dto/body.dto";
+import {
+    ConfirmDeliveryDto,
+    CreateOrderDto,
+    DeliveryDto,
+    OrderQueryDto,
+} from "./dto/body.dto";
 
 @ApiTags("Order")
 @Controller("order")
@@ -26,17 +31,71 @@ export class OrderController {
 
     @Post("create")
     @Roles(UserRole.BUYER)
-    @ApiOperation({ summary: "Create a new order" })
+    @ApiOperation({
+        summary: "Create a new order and generate CinetPay checkout URL",
+    })
     async createOrder(@Body() payload: CreateOrderDto, @Req() req: Request) {
         const user = req.user as UserPayload;
-        const result = await this.orderService.createOrder(user, payload);
+        const result = await this.orderService.createOrderWithCinetPay(
+            user,
+            payload,
+        );
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
             data: {
                 orderId: result.orderId,
                 checkOutUrl: result.checkoutSessionUrl,
+                paymentUrl: result.paymentUrl,
+                transactionId: result.transactionId,
             },
+        });
+    }
+
+    @Post("checkout/:orderId")
+    @Roles(UserRole.BUYER)
+    @ApiOperation({
+        summary: "Initiate CinetPay checkout for an existing order",
+    })
+    async initiateCheckout(
+        @Param("orderId") orderId: string,
+        @Req() req: Request,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.orderService.initiateCheckoutForOrder(
+            user,
+            orderId,
+        );
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: {
+                orderId: result.orderId,
+                checkOutUrl: result.checkoutSessionUrl,
+                paymentUrl: result.paymentUrl,
+                transactionId: result.transactionId,
+            },
+        });
+    }
+
+    @Post("verify/:transactionId")
+    @Roles(UserRole.BUYER)
+    @ApiOperation({
+        summary: "Verify CinetPay payment status server-to-server",
+    })
+    async verifyPayment(
+        @Param("transactionId") transactionId: string,
+        @Req() req: Request,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.orderService.verifyPayment(
+            user,
+            transactionId,
+        );
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
         });
     }
 
@@ -56,9 +115,15 @@ export class OrderController {
     @Get("producer-wise")
     @Roles(UserRole.PRODUCER)
     @ApiOperation({ summary: "Get producer's orders" })
-    async getProducerWiseOrders(@Req() req: Request, @Query() query: OrderQueryDto) {
+    async getProducerWiseOrders(
+        @Req() req: Request,
+        @Query() query: OrderQueryDto,
+    ) {
         const user = req.user as UserPayload;
-        const result = await this.orderService.getProducerWiseOrders(user, query);
+        const result = await this.orderService.getProducerWiseOrders(
+            user,
+            query,
+        );
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
@@ -87,7 +152,10 @@ export class OrderController {
         @Req() req: Request,
     ) {
         const user = req.user as UserPayload;
-        const result = await this.orderService.markDeliveryAsPickedUpOrCanceled(payload, user);
+        const result = await this.orderService.markDeliveryAsPickedUpOrCanceled(
+            payload,
+            user,
+        );
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
@@ -102,7 +170,10 @@ export class OrderController {
         @Req() req: Request,
     ) {
         const user = req.user as UserPayload;
-        const result = await this.orderService.sendDeliveryCompletionOtp(id, user);
+        const result = await this.orderService.sendDeliveryCompletionOtp(
+            id,
+            user,
+        );
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
@@ -117,11 +188,13 @@ export class OrderController {
         @Req() req: Request,
     ) {
         const user = req.user as UserPayload;
-        const result = await this.orderService.verifyDeliveryCompletionOtp(payload, user);
+        const result = await this.orderService.verifyDeliveryCompletionOtp(
+            payload,
+            user,
+        );
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
         });
     }
-
 }

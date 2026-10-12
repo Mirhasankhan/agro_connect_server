@@ -16,11 +16,19 @@ export default {
         payment_success: process.env.PAYMENT_SUCCESS_URL,
         payment_failed: process.env.PAYMENT_FAILED_URL,
     },
-    stripe: {
-        secret_key: process.env.STRIPE_SECRET_KEY,
-        webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
-        publishable_key: process.env.STRIPE_PUBLISHABLE_KEY,
-        client_id: process.env.STRIPE_CLIENT_ID,
+    cinetpay: {
+        api_url:
+            process.env.CINETPAY_API_URL ||
+            "https://api-checkout.cinetpay.com/v2/payment",
+        api_key: process.env.CINETPAY_API_KEY || "",
+        site_id: process.env.CINETPAY_SITE_ID || "",
+        notify_url: process.env.CINETPAY_NOTIFY_URL || "",
+        return_url:
+            process.env.CINETPAY_RETURN_URL ||
+            process.env.PAYMENT_SUCCESS_URL ||
+            "",
+        currency: process.env.CINETPAY_CURRENCY || "XOF",
+        channels: process.env.CINETPAY_CHANNELS || "ALL",
     },
     jwt: {
         jwt_secret: process.env.JWT_SECRET,

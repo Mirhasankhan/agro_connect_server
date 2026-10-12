@@ -3,8 +3,8 @@ import { JwtModule } from "@nestjs/jwt";
 import { Module } from "@nestjs/common";
 import { OrderService } from "./order.service";
 import { OrderController } from "./order.controller";
-import { StripeService } from "@/core/services/stripe/stripe.service";
-import { StripeWebhookController } from "./stripe-webhook.controller";
+import { CinetPayService } from "@/core/services/cinetpay/cinetpay.service";
+import { CinetpayWebhookController } from "./cinetpay-webhook.controller";
 
 @Module({
     imports: [
@@ -14,8 +14,8 @@ import { StripeWebhookController } from "./stripe-webhook.controller";
         }),
         JwtModule.register({ global: true }),
     ],
-    providers: [OrderService, StripeService],
-    controllers: [OrderController, StripeWebhookController],
-    exports: [OrderService],
+    providers: [OrderService, CinetPayService],
+    controllers: [OrderController, CinetpayWebhookController],
+    exports: [OrderService, CinetPayService],
 })
 export class OrderModule {}

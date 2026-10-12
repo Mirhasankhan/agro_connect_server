@@ -18,7 +18,6 @@ model User {
   isSetupCompleted Boolean        @default(false)
   profileImage     String?
   fcmToken         String?
-  stripeCustomerId String?
 
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -294,7 +293,7 @@ model Order {
   customerId            String        @db.ObjectId
   totalAmount           Float
   status                OrderStatus   @default(Pending)
-  stripePaymentIntentId String?
+  cinetpayTransactionId String?
   paymentStatus         PaymentStatus @default(Pending)
 
   cancelReason      String?

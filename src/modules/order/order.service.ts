@@ -1,7 +1,7 @@
 import { UserPayload } from "@/common/guards/auth.guard";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
-import { StripeService } from "@/core/services/stripe/stripe.service";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { CinetPayService } from "@/core/services/cinetpay/cinetpay.service";
+import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import {
     ConfirmDeliveryDto,
     CreateOrderDto,
@@ -9,7 +9,6 @@ import {
     OrderQueryDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
-import Stripe from "stripe";
 import QueryBuilder from "@/common/utils/queryBuilder";
 import { BcryptService } from "@/common/utils/bcrypt.service";
 import config from "@/config";
@@ -19,13 +18,146 @@ import sendEmail from "@/core/services/email";
 
 @Injectable()
 export class OrderService {
+    private readonly logger = new Logger(OrderService.name);
+
     constructor(
         private prisma: PrismaService,
         private bcryptService: BcryptService,
-        private stripe: StripeService,
+        private cinetpay: CinetPayService,
     ) {}
 
-    async createOrder(user: UserPayload, payload: CreateOrderDto) {
+    // async createOrder(user: UserPayload, payload: CreateOrderDto) {
+    //     const shippingAddress =
+    //         await this.prisma.shippingAddress.findUniqueOrThrow({
+    //             where: {
+    //                 id: payload.shippingAddressId,
+    //                 userId: user.id,
+    //             },
+    //             select: {
+    //                 id: true,
+    //             },
+    //         });
+
+    //     const rawCartIds = payload.cartIds;
+
+    //     const cartIds = Array.isArray(rawCartIds)
+    //         ? Array.from(new Set(rawCartIds.filter(Boolean)))
+    //         : [];
+
+    //     if (cartIds.length === 0) {
+    //         throw new ApiError(
+    //             HttpStatus.BAD_REQUEST,
+    //             "At least one cart item is required to create an order",
+    //         );
+    //     }
+
+    //     const carts = await this.prisma.cart.findMany({
+    //         where: {
+    //             userId: user.id,
+    //             id: {
+    //                 in: cartIds,
+    //             },
+    //         },
+    //         select: {
+    //             id: true,
+    //             quantity: true,
+    //             product: {
+    //                 select: {
+    //                     id: true,
+    //                     name: true,
+    //                     sellingUnit: true,
+    //                     availableQuantity: true,
+    //                     pricePerUnit: true,
+    //                 },
+    //             },
+    //         },
+    //     });
+
+    //     if (carts.length !== cartIds.length) {
+    //         throw new ApiError(
+    //             HttpStatus.BAD_REQUEST,
+    //             "Some cart ids are invalid or do not belong to this user",
+    //         );
+    //     }
+
+    //     const unavailableCart = carts.find(
+    //         (cart) => cart.quantity > cart.product.availableQuantity,
+    //     );
+
+    //     if (unavailableCart) {
+    //         throw new ApiError(
+    //             HttpStatus.BAD_REQUEST,
+    //             `Insufficient quantity available for ${unavailableCart.product.name}`,
+    //         );
+    //     }
+
+    //     const items = carts.map((cart) => ({
+    //         productId: cart.product.id,
+    //         quantity: cart.quantity,
+    //         productName: cart.product.name,
+    //         sellingUnit: cart.product.sellingUnit,
+    //         unitPrice: cart.product.pricePerUnit as number,
+    //         subtotal: cart.quantity * (cart.product.pricePerUnit as number),
+    //     }));
+
+    //     const totalAmount =
+    //         Math.round(
+    //             items.reduce((total, item) => total + item.subtotal, 0) * 100,
+    //         ) / 100;
+
+    //     const orderId = generateOrderId();
+
+    //     const order = await this.prisma.$transaction(async (transaction) => {
+    //         const order = await transaction.order.create({
+    //             data: {
+    //                 orderId,
+    //                 customerId: user.id,
+    //                 shippingAddressId: shippingAddress.id,
+    //                 status: "Pending",
+    //                 totalAmount,
+    //                 paymentStatus: "Pending",
+    //                 items: {
+    //                     create: items.map((item) => ({
+    //                         ...item,
+    //                         status: "Pending",
+    //                     })),
+    //                 },
+    //             },
+    //         });
+
+    //         return order;
+    //     });
+
+    //     const checkoutSession = await this.stripe.createCheckoutSession({
+    //         line_items: items.map((item) => ({
+    //             price_data: {
+    //                 currency: "usd",
+    //                 product_data: {
+    //                     name: item.productName,
+    //                     description: `Sold by ${item.sellingUnit}`,
+    //                 },
+    //                 unit_amount: Math.round(item.unitPrice * 100),
+    //             },
+    //             quantity: item.quantity,
+    //         })),
+    //         client: {
+    //             id: user.id,
+    //             email: user.email,
+    //         },
+    //         metadata: {
+    //             orderId: order.id,
+    //             customerId: user.id,
+    //         },
+    //     });
+
+    //     return {
+    //         message: "Order created successfully",
+    //         orderId,
+    //         checkoutSessionUrl: checkoutSession.url,
+    //     };
+    // }
+
+    async createOrderWithCinetPay(user: UserPayload, payload: CreateOrderDto) {
         const shippingAddress =
             await this.prisma.shippingAddress.findUniqueOrThrow({
                 where: {
@@ -34,6 +166,9 @@ export class OrderService {
                 },
                 select: {
                     id: true,
+                    addressLine: true,
+                    city: true,
+                    postCode: true,
                 },
             });
 
@@ -105,6 +240,7 @@ export class OrderService {
             ) / 100;
 
         const orderId = generateOrderId();
+        const transactionId = `CP_${orderId}_${Date.now()}`;
 
         const order = await this.prisma.$transaction(async (transaction) => {
             const order = await transaction.order.create({
@@ -115,6 +251,7 @@ export class OrderService {
                     status: "Pending",
                     totalAmount,
                     paymentStatus: "Pending",
+                    cinetpayTransactionId: transactionId,
                     items: {
                         create: items.map((item) => ({
                             ...item,
@@ -127,32 +264,158 @@ export class OrderService {
             return order;
         });
 
-        const checkoutSession = await this.stripe.createCheckoutSession({
-            line_items: items.map((item) => ({
-                price_data: {
-                    currency: "usd",
-                    product_data: {
-                        name: item.productName,
-                        description: `Sold by ${item.sellingUnit}`,
+        const customer = await this.prisma.user.findUnique({
+            where: { id: user.id },
+            select: {
+                fullName: true,
+                email: true,
+                buyerProfile: {
+                    select: {
+                        phoneNumber: true,
+                        city: true,
+                        address: true,
                     },
-                    unit_amount: Math.round(item.unitPrice * 100),
                 },
-                quantity: item.quantity,
-            })),
-            client: {
-                id: user.id,
-                email: user.email,
             },
+        });
+
+        const [firstName, ...lastNameParts] = (
+            customer?.fullName || "Valued Customer"
+        )
+            .trim()
+            .split(" ");
+        const lastName = lastNameParts.join(" ") || firstName;
+        const customerPhone = customer?.buyerProfile?.phoneNumber || "00000000";
+
+        const paymentResponse = await this.cinetpay.initiatePayment({
+            transactionId,
+            amount: totalAmount,
+            currency: config.cinetpay.currency,
+            description: `Payment for Order #${orderId}`,
+            channels: config.cinetpay.channels,
             metadata: {
                 orderId: order.id,
+                orderCustomId: orderId,
                 customerId: user.id,
+            },
+            customer: {
+                id: user.id,
+                name: firstName,
+                surname: lastName,
+                email: user.email,
+                phoneNumber: customerPhone,
+                address: shippingAddress.addressLine || "N/A",
+                city: shippingAddress.city || "Abidjan",
+                country: "CI",
+                zipCode: shippingAddress.postCode || "00225",
             },
         });
 
         return {
             message: "Order created successfully",
             orderId,
-            checkoutSessionUrl: checkoutSession.url,
+            checkoutSessionUrl: paymentResponse.paymentUrl,
+            paymentUrl: paymentResponse.paymentUrl,
+            transactionId,
+        };
+    }
+
+    async initiateCheckoutForOrder(user: UserPayload, orderId: string) {
+        const order = await this.prisma.order.findFirst({
+            where: {
+                OR: [{ id: orderId }, { orderId }],
+                customerId: user.id,
+            },
+            include: {
+                items: {
+                    include: {
+                        product: true,
+                    },
+                },
+                shippingAddress: true,
+                customer: {
+                    include: {
+                        buyerProfile: true,
+                    },
+                },
+            },
+        });
+
+        if (!order) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "Order not found");
+        }
+
+        if (order.paymentStatus === "Paid") {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "This order has already been paid",
+            );
+        }
+
+        if (order.status === "Cancelled") {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Cancelled orders cannot be paid",
+            );
+        }
+
+        for (const item of order.items) {
+            if (item.quantity > item.product.availableQuantity) {
+                throw new ApiError(
+                    HttpStatus.BAD_REQUEST,
+                    `Insufficient stock available for ${item.productName}`,
+                );
+            }
+        }
+
+        const transactionId = `CP_${order.orderId}_${Date.now()}`;
+
+        await this.prisma.order.update({
+            where: { id: order.id },
+            data: {
+                cinetpayTransactionId: transactionId,
+            },
+        });
+
+        const [firstName, ...lastNameParts] = (
+            order.customer.fullName || "Valued Customer"
+        )
+            .trim()
+            .split(" ");
+        const lastName = lastNameParts.join(" ") || firstName;
+        const customerPhone =
+            order.customer.buyerProfile?.phoneNumber || "00000000";
+
+        const paymentResponse = await this.cinetpay.initiatePayment({
+            transactionId,
+            amount: order.totalAmount,
+            currency: config.cinetpay.currency,
+            description: `Payment for Order #${order.orderId}`,
+            channels: config.cinetpay.channels,
+            metadata: {
+                orderId: order.id,
+                orderCustomId: order.orderId,
+                customerId: user.id,
+            },
+            customer: {
+                id: user.id,
+                name: firstName,
+                surname: lastName,
+                email: user.email,
+                phoneNumber: customerPhone,
+                address: order.shippingAddress.addressLine || "N/A",
+                city: order.shippingAddress.city || "Abidjan",
+                country: "CI",
+                zipCode: order.shippingAddress.postCode || "00225",
+            },
+        });
+
+        return {
+            message: "Checkout session generated successfully",
+            orderId: order.orderId,
+            checkoutSessionUrl: paymentResponse.paymentUrl,
+            paymentUrl: paymentResponse.paymentUrl,
+            transactionId,
         };
     }
 
@@ -543,184 +806,272 @@ export class OrderService {
         };
     }
 
-    //stripe webhook handler
+    // --- CinetPay Webhook and Payment Verification Handlers ---
 
-    async handleStripeWebhook(
-        payload: string | Buffer<ArrayBufferLike>,
-        signature: string,
-    ) {
-        console.log("Came here:", payload.toString());
-        const event = await this.stripe.constructEvent(payload, signature);
+    async handleCinetPayWebhook(payload: Record<string, unknown>) {
+        this.logger.log(
+            `Received CinetPay notification payload: ${JSON.stringify(payload)}`,
+        );
 
-        switch (event.type) {
-            case "checkout.session.completed": {
-                const session = event.data.object as Stripe.Checkout.Session;
+        const rawTxId =
+            payload?.cpm_trans_id ||
+            payload?.transaction_id ||
+            payload?.trans_id;
 
-                if (session.payment_status === "paid") {
-                    await this.markOrderAsPaid(session);
-                }
-                break;
-            }
-            case "checkout.session.async_payment_succeeded":
-                await this.markOrderAsPaid(
-                    event.data.object as Stripe.Checkout.Session,
-                );
-                break;
-            case "checkout.session.async_payment_failed":
-            case "checkout.session.expired":
-                await this.markOrderAsFailed(
-                    event.data.object as Stripe.Checkout.Session,
-                );
-                break;
-            default:
-                break;
-        }
+        const transactionId =
+            typeof rawTxId === "string"
+                ? rawTxId
+                : typeof rawTxId === "number"
+                  ? String(rawTxId)
+                  : undefined;
 
-        return { received: true };
-    }
-
-    private async markOrderAsPaid(session: Stripe.Checkout.Session) {
-        const orderId = session.metadata?.orderId;
-
-        if (!orderId) {
+        if (!transactionId || typeof transactionId !== "string") {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
-                "Stripe checkout session is missing order metadata",
+                "Missing transaction ID in CinetPay notification",
             );
         }
 
-        const paymentIntentId =
-            typeof session.payment_intent === "string"
-                ? session.payment_intent
+        const result = await this.verifyAndProcessOrderPayment(transactionId);
+        return {
+            received: true,
+            message: "CinetPay notification processed successfully",
+            data: result,
+        };
+    }
+
+    async verifyPayment(user: UserPayload, transactionId: string) {
+        const order = await this.prisma.order.findFirst({
+            where: {
+                OR: [
+                    { cinetpayTransactionId: transactionId },
+                    { orderId: transactionId },
+                    { id: transactionId },
+                ],
+                customerId: user.id,
+            },
+        });
+
+        if (!order) {
+            throw new ApiError(
+                HttpStatus.NOT_FOUND,
+                "Order associated with this transaction was not found",
+            );
+        }
+
+        const targetTxId = order.cinetpayTransactionId || transactionId;
+        const result = await this.verifyAndProcessOrderPayment(targetTxId);
+
+        return {
+            message: "Payment status verified successfully",
+            data: result,
+        };
+    }
+
+    async verifyAndProcessOrderPayment(transactionId: string) {
+        // Step 1: Query CinetPay server-to-server check API
+        const checkResult =
+            await this.cinetpay.checkTransactionStatus(transactionId);
+
+        // Step 2: Locate order
+        let order = await this.prisma.order.findFirst({
+            where: { cinetpayTransactionId: transactionId },
+            include: { items: true },
+        });
+
+        const metadataOrderId =
+            typeof checkResult.metadata?.orderId === "string"
+                ? checkResult.metadata.orderId
                 : undefined;
 
-        try {
-            await this.prisma.$transaction(async (transaction) => {
-                const order = await transaction.order.findUnique({
-                    where: { id: orderId },
-                    include: { items: true },
-                });
+        if (!order && metadataOrderId) {
+            order = await this.prisma.order.findUnique({
+                where: { id: metadataOrderId },
+                include: { items: true },
+            });
+        }
 
-                if (
-                    !order ||
-                    order.paymentStatus === "Paid" ||
-                    order.paymentStatus === "Refunded" ||
-                    order.paymentStatus === "Failed"
-                ) {
-                    return;
+        if (!order) {
+            this.logger.error(
+                `No order matches transaction ID: ${transactionId}`,
+            );
+            throw new ApiError(
+                HttpStatus.NOT_FOUND,
+                `Order not found for transaction ${transactionId}`,
+            );
+        }
+
+        // Step 3: Handle Idempotency - if already paid, return early
+        if (order.paymentStatus === "Paid") {
+            this.logger.log(
+                `Order ${order.orderId} is already marked as Paid. Skipping re-processing.`,
+            );
+            return {
+                orderId: order.orderId,
+                status: order.status,
+                paymentStatus: order.paymentStatus,
+                isPaid: true,
+            };
+        }
+
+        // Step 4: Handle successful payment (ACCEPTED)
+        if (checkResult.isSuccess) {
+            // Validate amount and currency
+            if (checkResult.amount !== undefined) {
+                const expectedAmount = Math.round(order.totalAmount);
+                const actualAmount = Math.round(Number(checkResult.amount));
+                if (Math.abs(expectedAmount - actualAmount) > 1) {
+                    this.logger.error(
+                        `Amount mismatch for order ${order.orderId}: expected ${expectedAmount}, received ${actualAmount}`,
+                    );
+                    throw new ApiError(
+                        HttpStatus.BAD_REQUEST,
+                        "Payment verification failed: Amount mismatch",
+                    );
                 }
+            }
 
-                await transaction.order.update({
-                    where: { id: order.id },
-                    data: {
-                        status: "Active",
-                        paymentStatus: "Paid",
-                        ...(paymentIntentId
-                            ? { stripePaymentIntentId: paymentIntentId }
-                            : {}),
-                    },
-                });
+            if (checkResult.currency && config.cinetpay.currency) {
+                if (
+                    checkResult.currency.toUpperCase() !==
+                    config.cinetpay.currency.toUpperCase()
+                ) {
+                    this.logger.error(
+                        `Currency mismatch for order ${order.orderId}: expected ${config.cinetpay.currency}, received ${checkResult.currency}`,
+                    );
+                    throw new ApiError(
+                        HttpStatus.BAD_REQUEST,
+                        "Payment verification failed: Currency mismatch",
+                    );
+                }
+            }
 
-                for (const item of order.items) {
-                    const result = await transaction.product.updateMany({
-                        where: {
-                            id: item.productId,
-                            availableQuantity: {
-                                gte: item.quantity,
-                            },
-                        },
+            try {
+                await this.prisma.$transaction(async (transaction) => {
+                    // Double check concurrency inside atomic transaction
+                    const currentOrder = await transaction.order.findUnique({
+                        where: { id: order.id },
+                    });
+
+                    if (
+                        !currentOrder ||
+                        currentOrder.paymentStatus === "Paid" ||
+                        currentOrder.paymentStatus === "Refunded"
+                    ) {
+                        return;
+                    }
+
+                    await transaction.order.update({
+                        where: { id: order.id },
                         data: {
-                            availableQuantity: {
-                                decrement: item.quantity,
-                            },
+                            status: "Active",
+                            paymentStatus: "Paid",
+                            cinetpayTransactionId: transactionId,
                         },
                     });
 
-                    if (result.count === 0) {
-                        throw new ApiError(
-                            HttpStatus.BAD_REQUEST,
-                            `Insufficient quantity available for ${item.productName}`,
-                        );
-                    }
-                }
+                    for (const item of order.items) {
+                        const result = await transaction.product.updateMany({
+                            where: {
+                                id: item.productId,
+                                availableQuantity: {
+                                    gte: item.quantity,
+                                },
+                            },
+                            data: {
+                                availableQuantity: {
+                                    decrement: item.quantity,
+                                },
+                                sold: {
+                                    increment: item.quantity,
+                                },
+                            },
+                        });
 
-                await transaction.cart.deleteMany({
-                    where: {
-                        userId: order.customerId,
-                        productId: {
-                            in: order.items.map((item) => item.productId),
+                        if (result.count === 0) {
+                            throw new ApiError(
+                                HttpStatus.BAD_REQUEST,
+                                `Insufficient quantity available for ${item.productName}`,
+                            );
+                        }
+                    }
+
+                    await transaction.cart.deleteMany({
+                        where: {
+                            userId: order.customerId,
+                            productId: {
+                                in: order.items.map((item) => item.productId),
+                            },
                         },
-                    },
+                    });
                 });
-            });
-        } catch (processingError) {
-            if (!paymentIntentId) {
+
+                this.logger.log(
+                    `Order ${order.orderId} successfully marked as Paid.`,
+                );
+
+                return {
+                    orderId: order.orderId,
+                    status: "Active",
+                    paymentStatus: "Paid",
+                    isPaid: true,
+                };
+            } catch (processingError: unknown) {
+                const errorMessage =
+                    processingError instanceof Error
+                        ? processingError.message
+                        : "Unknown fulfillment error";
+
+                this.logger.error(
+                    `Error during post-payment fulfillment for order ${order.orderId}: ${errorMessage}`,
+                );
+
                 await this.prisma.order.updateMany({
-                    where: { id: orderId },
+                    where: { id: order.id },
                     data: {
                         status: "Cancelled",
                         paymentStatus: "Failed",
-                        cancelReason: "Payment processing failed",
+                        cancelReason: `Order fulfillment failed after payment: ${errorMessage}`,
                     },
                 });
 
                 throw processingError;
             }
-
-            try {
-                await this.stripe.refundPaymentIntent(
-                    paymentIntentId,
-                    `order-refund-${orderId}`,
-                );
-
-                await this.prisma.$transaction([
-                    this.prisma.order.update({
-                        where: { id: orderId },
-                        data: {
-                            status: "Refunded",
-                            paymentStatus: "Refunded",
-                            stripePaymentIntentId: paymentIntentId,
-                            cancelReason:
-                                "Payment refunded because order processing failed",
-                        },
-                    }),
-                    this.prisma.orderItem.updateMany({
-                        where: { orderId },
-                        data: { status: "Refunded" },
-                    }),
-                ]);
-            } catch (refundError) {
-                await this.prisma.order.updateMany({
-                    where: { id: orderId },
-                    data: {
-                        status: "Cancelled",
-                        paymentStatus: "Failed",
-                        stripePaymentIntentId: paymentIntentId,
-                        cancelReason: "Payment refund failed",
-                    },
-                });
-
-                throw refundError;
-            }
-        }
-    }
-
-    private async markOrderAsFailed(session: Stripe.Checkout.Session) {
-        const orderId = session.metadata?.orderId;
-
-        if (!orderId) {
-            return;
         }
 
-        await this.prisma.order.updateMany({
-            where: {
-                id: orderId,
-                paymentStatus: "Pending",
-            },
-            data: {
+        // Step 5: Handle failed or rejected payment
+        if (checkResult.isFailed) {
+            this.logger.warn(
+                `CinetPay transaction ${transactionId} for order ${order.orderId} was rejected or cancelled (${checkResult.message}).`,
+            );
+
+            await this.prisma.order.updateMany({
+                where: {
+                    id: order.id,
+                    paymentStatus: "Pending",
+                },
+                data: {
+                    status: "Cancelled",
+                    paymentStatus: "Failed",
+                    cancelReason: `Payment rejected by CinetPay: ${checkResult.message || "Failed"}`,
+                },
+            });
+
+            return {
+                orderId: order.orderId,
                 status: "Cancelled",
                 paymentStatus: "Failed",
-            },
-        });
+                isPaid: false,
+            };
+        }
+
+        // Step 6: Pending or unknown status
+        return {
+            orderId: order.orderId,
+            status: order.status,
+            paymentStatus: order.paymentStatus,
+            isPaid: false,
+            message: `Transaction status is ${checkResult.status}`,
+        };
     }
 }

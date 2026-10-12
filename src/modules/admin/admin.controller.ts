@@ -117,6 +117,20 @@ export class AdminController {
         });
     }
 
+    @Get("all-categories")
+    @IsPublic()
+    @ApiOperation({ summary: "All categories" })
+    @Roles(UserRole.ADMIN)
+    async allCategories() {
+        const result = await this.adminService.getAllCategories();
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
     @Patch("toggle-category-status/:id")
     @ApiOperation({ summary: "Toggle category status" })
     @Roles(UserRole.ADMIN)

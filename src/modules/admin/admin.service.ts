@@ -313,6 +313,20 @@ export class AdminService {
         };
     }
 
+    async getAllCategories() {
+        const categories = await this.prisma.category.findMany({
+            omit: {
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+
+        return {
+            data: categories,
+            message: "All categories fetched successfully",
+        };
+    }
+
     async toggleCategoryStatus(categoryId: string) {
         const category = await this.prisma.category.findUniqueOrThrow({
             where: {
