@@ -80,6 +80,18 @@ export class AuthController {
             data: result.data,
         });
     }
+    @IsPublic()
+    @Post("admin-login")
+    @ApiOperation({ summary: "Login Admin" })
+    async adminLogin(@Body() payload: LoginUserDto) {
+        const result = await this.authService.adminLogin(payload);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
 
     @IsPublic()
     @Post("send-otp/password-reset")
@@ -193,6 +205,46 @@ export class AuthController {
         });
     }
 
+    @Put("update-producer-profile")
+    @Roles(UserRole.PRODUCER)
+    @UseInterceptors(
+        CustomFileFieldsInterceptor([
+            { name: "landCertificate", maxCount: 1 },
+            { name: "farmPhotoUrl", maxCount: 1 },
+            { name: "companyCertificate", maxCount: 1 },
+            { name: "rcmUrl", maxCount: 1 },
+            { name: "taxUrl", maxCount: 1 },
+            { name: "nidUrl", maxCount: 1 },
+        ]),
+        ParseFormDataInterceptor,
+    )
+    @ApiOperation({ summary: "Update Producer Profile" })
+    async updateProducerProfile(
+        @Body() payload: Partial<CreateProducerProfileDto>,
+        @Req() req: Request,
+        @UploadedFiles()
+        files?: {
+            landCertificate?: Express.Multer.File[];
+            farmPhotoUrl?: Express.Multer.File[];
+            companyCertificate?: Express.Multer.File[];
+            rcmUrl?: Express.Multer.File[];
+            taxUrl?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.updateProducerProfile(
+            user,
+            payload,
+            files,
+        );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+
     @Post("create-driver-profile")
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
@@ -220,6 +272,43 @@ export class AuthController {
     ) {
         const user = req.user as UserPayload;
         const result = await this.authService.createDriverProfile(
+            user,
+            payload,
+            files,
+        );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+    @Post("update-driver-profile")
+    @Roles(UserRole.DRIVER)
+    @UseInterceptors(
+        CustomFileFieldsInterceptor([
+            { name: "drivingLicenseUrl", maxCount: 1 },
+            { name: "vehicleRegistrationUrl", maxCount: 1 },
+            { name: "insuranceUrl", maxCount: 1 },
+            { name: "policeClearanceUrl", maxCount: 1 },
+            { name: "nidUrl", maxCount: 1 },
+        ]),
+        ParseFormDataInterceptor,
+    )
+    @ApiOperation({ summary: "Update Driver Profile" })
+    async updateDriverProfile(
+        @Body() payload: CreateDriverProfileDto,
+        @Req() req: Request,
+        @UploadedFiles()
+        files?: {
+            drivingLicenseUrl?: Express.Multer.File[];
+            vehicleRegistrationUrl?: Express.Multer.File[];
+            insuranceUrl?: Express.Multer.File[];
+            policeClearanceUrl?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.updateDriverProfile(
             user,
             payload,
             files,

@@ -24,6 +24,7 @@ import { UserPayload } from "@/common/guards/auth.guard";
 import { background } from "@/common/utils/background";
 import sendEmail from "@/core/services/email";
 import { FileService } from "@/core/services/files/cloudinary.service";
+import { UserRole } from "@prisma/client";
 
 @Injectable()
 export class AuthService {
@@ -222,6 +223,46 @@ export class AuthService {
                 accessToken,
                 role: userData.role,
                 isSetuCompleted: userData.isSetupCompleted,
+            },
+        };
+    }
+    async adminLogin(payload: LoginUserDto) {
+        const adminData = await this.prisma.user.findUnique({
+            where: {
+                email: payload.email,
+                role: UserRole.ADMIN,
+            },
+        });
+
+        if (!adminData) {
+            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
+        }
+
+        const passwordMatched = await this.bcryptService.compare(
+            payload.password,
+            adminData.password,
+        );
+
+        if (!passwordMatched) {
+            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
+        }
+
+        const jwtPayload = {
+            id: adminData.id,
+            email: adminData.email,
+            role: adminData.role,
+        } satisfies UserPayload;
+
+        const accessToken = this.jwtService.sign(jwtPayload, {
+            secret: config.jwt.jwt_secret,
+            expiresIn: config.jwt.jwt_secret_expires_in,
+        });
+
+        return {
+            message: "Admin Login successful",
+            data: {
+                accessToken,
+                role: adminData.role,
             },
         };
     }
@@ -588,6 +629,123 @@ export class AuthService {
         };
     }
 
+    async updateProducerProfile(
+        user: UserPayload,
+        payload: Partial<CreateProducerProfileDto>,
+        files?: {
+            landCertificate?: Express.Multer.File[];
+            farmPhotoUrl?: Express.Multer.File[];
+            companyCertificate?: Express.Multer.File[];
+            rcmUrl?: Express.Multer.File[];
+            taxUrl?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
+    ) {
+        const existingProfile = await this.prisma.producerProfile.findUnique({
+            where: {
+                userId: user.id,
+            },
+            omit: {
+                updatedAt: true,
+                createdAt: true,
+                userId: true,
+                address: true,
+                city: true,
+                region: true,
+                phoneNumber: true,
+                verificationStatus: true,
+            },
+        });
+        if (!existingProfile) {
+            throw new ApiError(
+                HttpStatus.NOT_FOUND,
+                "Producer profile not found",
+            );
+        }
+
+        const landCertificateFile = files?.landCertificate?.[0];
+        const farmPhotoFile = files?.farmPhotoUrl?.[0];
+        const companyCertificateFile = files?.companyCertificate?.[0];
+        const rcmFile = files?.rcmUrl?.[0];
+        const taxFile = files?.taxUrl?.[0];
+        const nidFile = files?.nidUrl?.[0];
+
+        let landCertificate: string | null = null;
+        let farmPhotoUrl: string | null = null;
+        let companyCertificate: string | null = null;
+        let rcmUrl: string | null = null;
+        let taxUrl: string | null = null;
+        let nidUrl: string | null = null;
+
+        try {
+            if (nidFile) {
+                nidUrl = await this.fileService.uploadToCloudinary(nidFile);
+            }
+
+            if (landCertificateFile) {
+                landCertificate =
+                    await this.fileService.uploadToCloudinary(
+                        landCertificateFile,
+                    );
+            }
+
+            if (farmPhotoFile) {
+                farmPhotoUrl =
+                    await this.fileService.uploadToCloudinary(farmPhotoFile);
+            }
+
+            if (companyCertificateFile) {
+                companyCertificate = await this.fileService.uploadToCloudinary(
+                    companyCertificateFile,
+                );
+            }
+
+            if (rcmFile) {
+                rcmUrl = await this.fileService.uploadToCloudinary(rcmFile);
+            }
+
+            if (taxFile) {
+                taxUrl = await this.fileService.uploadToCloudinary(taxFile);
+            }
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+
+            throw new ApiError(
+                HttpStatus.BAD_GATEWAY,
+                "Producer document upload failed",
+            );
+        }
+
+        await this.prisma.producerProfile.update({
+            where: {
+                userId: user.id,
+            },
+            data: {
+                companyCertificate:
+                    companyCertificate ?? existingProfile.companyCertificate,
+                farmPhotoUrl: farmPhotoUrl ?? existingProfile.farmPhotoUrl,
+                landCertificate:
+                    landCertificate ?? existingProfile.landCertificate,
+                rcmUrl: rcmUrl ?? existingProfile.rcmUrl,
+                taxUrl: taxUrl ?? existingProfile.taxUrl,
+                nidUrl: nidUrl ?? existingProfile.nidUrl,
+                farmLocation:
+                    payload.farmLocation ?? existingProfile.farmLocation,
+                farmSize: payload.farmSize ?? existingProfile.farmSize,
+                farmName: payload.farmName ?? existingProfile.farmName,
+                companyName: payload.companyName ?? existingProfile.companyName,
+                sirenNo: payload.sirenNo ?? existingProfile.sirenNo,
+                rccmNo: payload.rccmNo ?? existingProfile.rccmNo,
+            },
+        });
+
+        return {
+            message: "Producer profile updated successfully",
+        };
+    }
+
     async createDriverProfile(
         user: UserPayload,
         payload: CreateDriverProfileDto,
@@ -685,6 +843,99 @@ export class AuthService {
 
         return {
             message: "Driver profile created successfully",
+        };
+    }
+
+    async updateDriverProfile(
+        user: UserPayload,
+        payload: Partial<CreateDriverProfileDto>,
+        files?: {
+            drivingLicenseUrl?: Express.Multer.File[];
+            vehicleRegistrationUrl?: Express.Multer.File[];
+            insuranceUrl?: Express.Multer.File[];
+            policeClearanceUrl?: Express.Multer.File[];
+            nidUrl?: Express.Multer.File[];
+        },
+    ) {
+        const existingProfile = await this.prisma.driverProfile.findUnique({
+            where: {
+                userId: user.id,
+            },
+            omit: {
+                updatedAt: true,
+                createdAt: true,
+                userId: true,
+                address: true,
+                city: true,
+                region: true,
+                phoneNumber: true,
+                verificationStatus: true,
+            },
+        });
+        if (!existingProfile) {
+            throw new ApiError(
+                HttpStatus.NOT_FOUND,
+                "Driver profile not found",
+            );
+        }
+
+        let drivingLicenseUrl = existingProfile.drivingLicenseUrl;
+        let vehicleRegistrationUrl = existingProfile.vehicleRegistrationUrl;
+        let insuranceUrl = existingProfile.insuranceUrl;
+        let policeClearanceUrl = existingProfile.policeClearanceUrl;
+        let nidUrl = existingProfile.nidUrl;
+
+        if (files) {
+            if (files.drivingLicenseUrl && files.drivingLicenseUrl.length > 0) {
+                drivingLicenseUrl = await this.fileService.uploadToCloudinary(
+                    files.drivingLicenseUrl[0],
+                );
+            }
+            if (
+                files.vehicleRegistrationUrl &&
+                files.vehicleRegistrationUrl.length > 0
+            ) {
+                vehicleRegistrationUrl =
+                    await this.fileService.uploadToCloudinary(
+                        files.vehicleRegistrationUrl[0],
+                    );
+            }
+            if (files.insuranceUrl && files.insuranceUrl.length > 0) {
+                insuranceUrl = await this.fileService.uploadToCloudinary(
+                    files.insuranceUrl[0],
+                );
+            }
+            if (
+                files.policeClearanceUrl &&
+                files.policeClearanceUrl.length > 0
+            ) {
+                policeClearanceUrl = await this.fileService.uploadToCloudinary(
+                    files.policeClearanceUrl[0],
+                );
+            }
+            if (files.nidUrl && files.nidUrl.length > 0) {
+                nidUrl = await this.fileService.uploadToCloudinary(
+                    files.nidUrl[0],
+                );
+            }
+        }
+
+        await this.prisma.driverProfile.update({
+            where: {
+                userId: user.id,
+            },
+            data: {
+                drivingLicenseUrl,
+                vehicleRegistrationUrl,
+                insuranceUrl,
+                policeClearanceUrl,
+                nidUrl,
+                ...payload,
+            },
+        });
+
+        return {
+            message: "Driver profile updated successfully",
         };
     }
 

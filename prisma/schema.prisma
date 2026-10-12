@@ -29,9 +29,7 @@ model User {
   wishlists         Wishlist[]
   orders            Order[]
   driverProfile     DriverProfile?
-  deliveries        Delivery[]
-  producerEarnings  ProducerEarning[]
-  driverEarnings    DriverEarning[]
+  deliveries        Delivery[]  
   conversationsA    Conversation[]    @relation("ConversationParticipantA")
   conversationsB    Conversation[]    @relation("ConversationParticipantB")
   sentMessages      ChatMessage[]     @relation("MessageSender")
@@ -111,6 +109,8 @@ model ProducerProfile {
   companyCertificate String?
   rcmUrl             String?
   taxUrl             String?
+  currentEarnings    Float   @default(0)
+  allTimeEarnings    Float   @default(0)
 
   // Verification
   verificationStatus VerificationStatus @default(Pending)
@@ -118,24 +118,6 @@ model ProducerProfile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model ProducerEarning {
-  id               String    @id @default(auto()) @map("_id") @db.ObjectId
-  producerId       String    @db.ObjectId
-  orderItemId      String    @db.ObjectId
-  amount           Float
-  isTransferred    Boolean   @default(false)
-  stripeTransferId String?
-  paidAt           DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  producer  User      @relation(fields: [producerId], references: [id])
-  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
-
-  @@unique([orderItemId])
 }
 
 model DriverProfile {
@@ -161,38 +143,24 @@ model DriverProfile {
   verificationStatus VerificationStatus @default(Pending)
   rejectionReason    String?
   isAvailable        Boolean            @default(false)
+  currentEarnings    Float              @default(0)
+  allTimeEarnings    Float              @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model DriverEarning {
-  id               String    @id @default(auto()) @map("_id") @db.ObjectId
-  driverId         String    @db.ObjectId
-  orderId          String    @unique @db.ObjectId
-  amount           Int
-  isTransferred    Boolean   @default(false)
-  stripeTransferId String?
-  paidAt           DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  driver User  @relation(fields: [driverId], references: [id])
-  order  Order @relation(fields: [orderId], references: [id])
 }
 
 model BuyerProfile {
-  id           String @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String @unique @db.ObjectId
-  user         User   @relation(fields: [userId], references: [id])
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String @unique @db.ObjectId
+  user        User   @relation(fields: [userId], references: [id])
   // Personal / identity information
-  phoneNumber  String
-  city         String
-  region       String
-  address      String
-  profileType  String
-  institution  String
+  phoneNumber String
+  city        String
+  region      String
+  address     String
+  profileType String
+  institution String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -234,7 +202,7 @@ model ShippingAddress {
   userId      String   @db.ObjectId
   addressLine String
   city        String
-  postCode    String  
+  postCode    String
   instruction String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -273,11 +241,11 @@ model Product {
   availableQuantity Int
   sold              Int         @default(0)
 
-  isFeatured   Boolean       @default(false)
-  isCertified  Boolean       @default(false)
-  isActive     Boolean       @default(true)
-  avgRating    Float         @default(0)
-  totalReviews Int           @default(0)
+  isFeatured   Boolean @default(false)
+  isCertified  Boolean @default(false)
+  isActive     Boolean @default(true)
+  avgRating    Float   @default(0)
+  totalReviews Int     @default(0)
 
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -286,7 +254,6 @@ model Product {
   orderItems OrderItem[]
   reviews    Review[]
 }
-
 
 model Cart {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
@@ -339,7 +306,6 @@ model Order {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   deliveries    Delivery[]
-  driverEarning DriverEarning?
 
   @@map("orders")
 }
@@ -365,7 +331,6 @@ model OrderItem {
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  producerEarning ProducerEarning?
   review          Review?
 
   @@map("orderItems")

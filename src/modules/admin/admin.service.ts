@@ -39,13 +39,18 @@ export class AdminService {
             .sort()
             .paginate()
             .select({
+                id: true,
                 fullName: true,
                 email: true,
-                profileImage: true,              
+                profileImage: true,
+                _count: {
+                    select: {
+                        products: true,
+                    },
+                },
                 producerProfile: {
-                    omit: {
-                        updatedAt: true,
-                        userId: true,
+                    select: {
+                        farmName: true,
                     },
                 },
             });
@@ -114,7 +119,7 @@ export class AdminService {
             .select({
                 fullName: true,
                 email: true,
-                profileImage: true,              
+                profileImage: true,
                 driverProfile: {
                     omit: {
                         updatedAt: true,
@@ -311,7 +316,4 @@ export class AdminService {
             message: "Driver assigned to delivery successfully",
         };
     }
-
-
-    
 }

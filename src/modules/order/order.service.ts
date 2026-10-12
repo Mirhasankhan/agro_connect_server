@@ -25,8 +25,6 @@ export class OrderService {
         private stripe: StripeService,
     ) {}
 
- 
-
     async createOrder(user: UserPayload, payload: CreateOrderDto) {
         const shippingAddress =
             await this.prisma.shippingAddress.findUniqueOrThrow({
@@ -68,7 +66,7 @@ export class OrderService {
                         name: true,
                         sellingUnit: true,
                         availableQuantity: true,
-                        pricePerUnit: true,                       
+                        pricePerUnit: true,
                     },
                 },
             },
@@ -290,7 +288,7 @@ export class OrderService {
                 cancelReason: true,
                 shippingAddress: {
                     select: {
-                        addressLine: true,                    
+                        addressLine: true,
                         city: true,
                         instruction: true,
                         postCode: true,
@@ -510,20 +508,32 @@ export class OrderService {
                         status: "Delivered",
                     },
                 });
-                await transaction.producerEarning.create({
+                await transaction.producerProfile.update({
+                    where: {
+                        userId: item.product.producerId,
+                    },
                     data: {
-                        producerId: item.product.producerId,
-                        orderItemId: item.id,
-                        amount: item.subtotal * 0.9, // Assuming 10% platform fee
+                        allTimeEarnings: {
+                            increment: item.subtotal * 0.9, // Assuming 10% platform fee
+                        },
+                        currentEarnings: {
+                            increment: item.subtotal * 0.9, // Assuming 10% platform fee
+                        },
                     },
                 });
             }
 
-            await transaction.driverEarning.create({
+            await transaction.driverProfile.update({
+                where: {
+                    userId: user.id,
+                },
                 data: {
-                    driverId: user.id,
-                    orderId: delivery.order.id,
-                    amount: 50,
+                    allTimeEarnings: {
+                        increment: 50,
+                    },
+                    currentEarnings: {
+                        increment: 50,
+                    },
                 },
             });
         });
