@@ -24,7 +24,6 @@ import { UserPayload } from "@/common/guards/auth.guard";
 import { background } from "@/common/utils/background";
 import sendEmail from "@/core/services/email";
 import { FileService } from "@/core/services/files/cloudinary.service";
-import { UserRole } from "@prisma/client";
 
 @Injectable()
 export class AuthService {
@@ -226,46 +225,7 @@ export class AuthService {
             },
         };
     }
-    async adminLogin(payload: LoginUserDto) {
-        const adminData = await this.prisma.user.findUnique({
-            where: {
-                email: payload.email,
-                role: UserRole.ADMIN,
-            },
-        });
-
-        if (!adminData) {
-            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
-        }
-
-        const passwordMatched = await this.bcryptService.compare(
-            payload.password,
-            adminData.password,
-        );
-
-        if (!passwordMatched) {
-            throw new ApiError(HttpStatus.UNAUTHORIZED, "Invalid Credentials");
-        }
-
-        const jwtPayload = {
-            id: adminData.id,
-            email: adminData.email,
-            role: adminData.role,
-        } satisfies UserPayload;
-
-        const accessToken = this.jwtService.sign(jwtPayload, {
-            secret: config.jwt.jwt_secret,
-            expiresIn: config.jwt.jwt_secret_expires_in,
-        });
-
-        return {
-            message: "Admin Login successful",
-            data: {
-                accessToken,
-                role: adminData.role,
-            },
-        };
-    }
+ 
 
     async sendForgotPasswordOtp(payload: ResendOtpDto) {
         const userData = await this.prisma.user.findUnique({

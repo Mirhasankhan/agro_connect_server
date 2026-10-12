@@ -79,19 +79,7 @@ export class AuthController {
             message: result.message,
             data: result.data,
         });
-    }
-    @IsPublic()
-    @Post("admin-login")
-    @ApiOperation({ summary: "Login Admin" })
-    async adminLogin(@Body() payload: LoginUserDto) {
-        const result = await this.authService.adminLogin(payload);
-
-        return ResponseService.formatResponse({
-            statusCode: HttpStatus.OK,
-            message: result.message,
-            data: result.data,
-        });
-    }
+    } 
 
     @IsPublic()
     @Post("send-otp/password-reset")
@@ -282,7 +270,7 @@ export class AuthController {
             message: result.message,
         });
     }
-    @Post("update-driver-profile")
+    @Put("update-driver-profile")
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
         CustomFileFieldsInterceptor([

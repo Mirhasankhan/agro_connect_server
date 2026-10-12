@@ -21,6 +21,7 @@ import {
     DriverQueryDto,
     ProducerQueryDto,
     AssignDriverDto,
+    BaseUserQueryDto,
 } from "./dto/body.dto";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
@@ -70,11 +71,25 @@ export class AdminController {
         });
     }
 
+    @Get("all-buyers")
+    @ApiOperation({ summary: "All buyers" })
+    @Roles(UserRole.ADMIN)
+    async allBuyers(@Query() query: BaseUserQueryDto) {
+        const result = await this.adminService.getAllBuyerFromDB(query);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
     @Patch("driver-approval")
     @ApiOperation({ summary: "Accept/reject driver account" })
     @Roles(UserRole.ADMIN)
     async acceptRejectDriverAccount(@Body() payload: AcceptRejectAccountDto) {
-        const result = await this.adminService.acceptRejectDriverAccount(payload);            
+        const result =
+            await this.adminService.acceptRejectDriverAccount(payload);
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,

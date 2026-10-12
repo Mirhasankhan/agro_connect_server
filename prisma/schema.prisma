@@ -138,6 +138,8 @@ model DriverProfile {
   vehicleRegistrationUrl String
   insuranceUrl           String
   policeClearanceUrl     String
+  avgRating              Float             @default(0)
+  totalReviews           Int               @default(0)
 
   // Verification
   verificationStatus VerificationStatus @default(Pending)

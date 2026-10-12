@@ -8,6 +8,7 @@ import {
     DriverQueryDto,
     ProducerQueryDto,
     AssignDriverDto,
+    BaseUserQueryDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
@@ -51,19 +52,44 @@ export class AdminService {
                 producerProfile: {
                     select: {
                         farmName: true,
+                        allTimeEarnings: true,
+                        verificationStatus: true,
+                        producerType: true,
                     },
                 },
             });
 
-        const [allProducer, pagination] = await Promise.all([
+        const [
+            allProducer,
+            pagination,
+            pendingReview,
+            certified,
+            productCount,
+        ] = await Promise.all([
             response.execute(),
             response.countTotal(),
+            this.prisma.producerProfile.count({
+                where: {
+                    verificationStatus: "Pending",
+                },
+            }),
+            this.prisma.producerProfile.count({
+                where: {
+                    verificationStatus: "Accepted",
+                },
+            }),
+            this.prisma.product.count(),
         ]);
 
         return {
             data: {
                 users: allProducer,
-                meta: pagination,
+                meta: {
+                    ...pagination,
+                    pendingReview,
+                    certified,
+                    productCount,
+                },
             },
             message: "All producer fetched successfully",
         };
@@ -117,28 +143,110 @@ export class AdminService {
             .sort()
             .paginate()
             .select({
+                id: true,
                 fullName: true,
                 email: true,
                 profileImage: true,
+                _count: {
+                    select: {
+                        deliveries: true,
+                    },
+                },
                 driverProfile: {
-                    omit: {
-                        updatedAt: true,
-                        userId: true,
+                    select: {
+                        avgRating: true,
+                        verificationStatus: true,
+                        vehicleType: true,
+                        isAvailable: true,
+                        phoneNumber: true,
                     },
                 },
             });
 
-        const [allDriver, pagination] = await Promise.all([
-            response.execute(),
-            response.countTotal(),
-        ]);
+        const [allDriver, pagination, activeDriversCount, pendingDriversCount] =
+            await Promise.all([
+                response.execute(),
+                response.countTotal(),
+                this.prisma.driverProfile.count({
+                    where: {
+                        verificationStatus: "Accepted",
+                    },
+                }),
+                this.prisma.driverProfile.count({
+                    where: {
+                        verificationStatus: "Pending",
+                    },
+                }),
+            ]);
 
         return {
             data: {
                 users: allDriver,
-                meta: pagination,
+                meta: {
+                    ...pagination,
+                    activeDriversCount,
+                    pendingDriversCount,
+                },
             },
             message: "All driver fetched successfully",
+        };
+    }
+
+    async getAllBuyerFromDB(query: BaseUserQueryDto) {
+        const queryBuilder = new QueryBuilder(this.prisma.user, query);
+
+        const response = queryBuilder
+            .search(["email", "fullName"])
+            .rawFilter({
+                role: {
+                    equals: UserRole.BUYER,
+                },
+            })
+            .sort()
+            .paginate()
+            .select({
+                id: true,
+                fullName: true,
+                email: true,
+                profileImage: true,
+                status: true,
+                _count: {
+                    select: {
+                        orders: {
+                            where: { paymentStatus: "Paid" },
+                        },
+                    },
+                },
+
+                buyerProfile: {
+                    select: {
+                        phoneNumber: true,
+                        profileType: true,
+                        city: true,
+                    },
+                },
+            });
+
+        const [allBuyer, pagination, suspended] = await Promise.all([
+            response.execute(),
+            response.countTotal(),
+            this.prisma.user.count({
+                where: {
+                    role: UserRole.BUYER,
+                    status: "SUSPENDED",
+                },
+            }),
+        ]);
+
+        return {
+            data: {
+                users: allBuyer,
+                meta: {
+                    ...pagination,
+                    suspended,
+                },
+            },
+            message: "All buyer fetched successfully",
         };
     }
 
