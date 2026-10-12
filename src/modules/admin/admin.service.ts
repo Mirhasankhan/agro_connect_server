@@ -99,7 +99,9 @@ export class AdminService {
         await this.prisma.producerProfile.findUniqueOrThrow({
             where: {
                 userId: payload.accountId,
-                verificationStatus: "Pending",
+                verificationStatus: {
+                    in: ["Pending", "Rejected"],
+                },
             },
         });
 
@@ -114,7 +116,7 @@ export class AdminService {
             where: { userId: payload.accountId },
             data: {
                 verificationStatus: payload.isAccept ? "Accepted" : "Rejected",
-                rejectionReason: payload.rejectReason,
+                rejectionReason: payload.isAccept ? null : payload.rejectReason,
             },
         });
 

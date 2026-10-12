@@ -413,6 +413,7 @@ enum SellingUnit {
   LITER
   BAG
   BUNDLE
+  CRATE
 }
 
 // ---------------- ENUM ----------------
