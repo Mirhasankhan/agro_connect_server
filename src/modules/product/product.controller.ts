@@ -91,9 +91,15 @@ export class ProductController {
     @Roles(UserRole.PRODUCER)
     @OptionalAuth()
     @ApiOperation({ summary: "Get all products by producer" })
-    async getAllProductsByProducer(@Req() req: Request, @Query() query: ProductQueryDto) {
+    async getAllProductsByProducer(
+        @Req() req: Request,
+        @Query() query: ProductQueryDto,
+    ) {
         const user = req.user as UserPayload;
-        const result = await this.productService.getProductByProducer(user, query);
+        const result = await this.productService.getProductByProducer(
+            user,
+            query,
+        );
 
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
@@ -116,8 +122,6 @@ export class ProductController {
             data: result.data,
         });
     }
-
-
 
     @Put("update")
     @Roles(UserRole.PRODUCER)
@@ -158,7 +162,18 @@ export class ProductController {
             message: result.message,
         });
     }
+
+    @Get("producer-info/:id")
+    @OptionalAuth()
+    @ApiOperation({ summary: "Get producer info by ID" })
+    async getProducerInfo(@Req() req: Request, @Param("id") id: string) {
+        const user = req.user as UserPayload;
+        const result = await this.productService.getProducerInfo(id, user);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
 }
-
-
-

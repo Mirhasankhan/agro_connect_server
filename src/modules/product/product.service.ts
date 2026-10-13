@@ -189,7 +189,7 @@ export class ProductService {
     async getTopRatedProducts(user?: UserPayload) {
         const products = await this.prisma.product.findMany({
             where: {
-                isActive: true,               
+                isActive: true,
             },
             orderBy: {
                 avgRating: "desc",
@@ -423,11 +423,86 @@ export class ProductService {
         };
     }
 
-    async getProducerInfo(producerId: string) {
+    async getProducerInfo(producerId: string, user?: UserPayload) {
         const producer = await this.prisma.user.findUniqueOrThrow({
             where: { id: producerId },
             select: {
                 id: true,
+                createdAt: true,
+                fullName: true,
+                profileImage: true,
+                producerProfile: {
+                    select: {
+                        farmName: true,
+                        phoneNumber: true,
+                        farmLocation: true,
+                    },
+                },
+            },
+        });
+
+        const reviews = await this.prisma.review.findMany({
+            where: {
+                product: {
+                    producerId: producer.id,
+                },
+            },
+            select: {
+                id: true,
+                rating: true,
+                comment: true,
+                createdAt: true,
+                product: {
+                    select: {
+                        name: true,
+                    },
+                },
+                buyer: {
+                    select: {
+                        fullName: true,
+                        profileImage: true,
+                    },
+                },
+            },
+        });
+
+        const avgRating = reviews.length
+            ? reviews.reduce((sum, review) => sum + review.rating, 0) /
+              reviews.length
+            : 0;
+
+        const products = await this.prisma.product.findMany({
+            where: {
+                producerId: producer.id,
+            },
+            select: {
+                id: true,
+                imageUrls: true,
+                name: true,
+                pricePerUnit: true,
+                sellingUnit: true,
+                category: {
+                    select: {
+                        name: true,
+                    },
+                },
+                wishlists: user?.id
+                    ? {
+                          where: { userId: user.id },
+                          select: { id: true },
+                      }
+                    : false,
+            },
+        });
+
+        const totalOrders = await this.prisma.orderItem.count({
+            where: {
+                product: {
+                    producerId: producer.id,
+                },
+                order: {
+                    paymentStatus: "Paid",
+                },
             },
         });
 
@@ -435,6 +510,10 @@ export class ProductService {
             message: "Producer info fetched successfully",
             data: {
                 producer,
+                reviews,
+                products,
+                avgRating,
+                totalOrders,
             },
         };
     }
