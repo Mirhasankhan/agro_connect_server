@@ -3,7 +3,7 @@ import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
-
+import { NotificationModule } from "../notification/notification.module";
 
 @Module({
     imports: [
@@ -12,6 +12,7 @@ import { AuthService } from "./auth.service";
             maxRedirects: 5,
         }),
         JwtModule.register({ global: true }),
+        NotificationModule,
     ],
     providers: [AuthService],
     controllers: [AuthController],

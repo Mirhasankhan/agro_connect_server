@@ -404,6 +404,7 @@ model Notification {
 }
 
 enum TNotificationType {
+  Profile
   Order
   Payment
   Delivery
