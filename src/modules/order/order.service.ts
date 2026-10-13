@@ -157,6 +157,148 @@ export class OrderService {
     //     };
     // }
 
+    async createOrderForTesting(user: UserPayload, payload: CreateOrderDto) {
+        const shippingAddress =
+            await this.prisma.shippingAddress.findUniqueOrThrow({
+                where: {
+                    id: payload.shippingAddressId,
+                    userId: user.id,
+                },
+                select: {
+                    id: true,
+                },
+            });
+
+        const cartIds = Array.isArray(payload.cartIds)
+            ? Array.from(new Set(payload.cartIds.filter(Boolean)))
+            : [];
+
+        if (cartIds.length === 0) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "At least one cart item is required to create an order",
+            );
+        }
+
+        const carts = await this.prisma.cart.findMany({
+            where: {
+                userId: user.id,
+                id: {
+                    in: cartIds,
+                },
+            },
+            select: {
+                id: true,
+                quantity: true,
+                product: {
+                    select: {
+                        id: true,
+                        name: true,
+                        sellingUnit: true,
+                        availableQuantity: true,
+                        pricePerUnit: true,
+                    },
+                },
+            },
+        });
+
+        if (carts.length !== cartIds.length) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Some cart ids are invalid or do not belong to this user",
+            );
+        }
+
+        const unavailableCart = carts.find(
+            (cart) => cart.quantity > cart.product.availableQuantity,
+        );
+
+        if (unavailableCart) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                `Insufficient quantity available for ${unavailableCart.product.name}`,
+            );
+        }
+
+        const items = carts.map((cart) => ({
+            productId: cart.product.id,
+            quantity: cart.quantity,
+            productName: cart.product.name,
+            sellingUnit: cart.product.sellingUnit,
+            unitPrice: cart.product.pricePerUnit as number,
+            subtotal: cart.quantity * (cart.product.pricePerUnit as number),
+        }));
+
+        const totalAmount =
+            Math.round(
+                items.reduce((total, item) => total + item.subtotal, 0) * 100,
+            ) / 100;
+        const orderId = generateOrderId();
+
+        await this.prisma.$transaction(async (transaction) => {
+            const order = await transaction.order.create({
+                data: {
+                    orderId,
+                    customerId: user.id,
+                    shippingAddressId: shippingAddress.id,
+                    status: "Active",
+                    totalAmount,
+                    paymentStatus: "Paid",
+                    items: {
+                        create: items.map((item) => ({
+                            ...item,
+                            status: "Pending",
+                        })),
+                    },
+                },
+            });
+
+            for (const item of items) {
+                const result = await transaction.product.updateMany({
+                    where: {
+                        id: item.productId,
+                        availableQuantity: {
+                            gte: item.quantity,
+                        },
+                    },
+                    data: {
+                        availableQuantity: {
+                            decrement: item.quantity,
+                        },
+                        sold: {
+                            increment: item.quantity,
+                        },
+                    },
+                });
+
+                if (result.count === 0) {
+                    throw new ApiError(
+                        HttpStatus.BAD_REQUEST,
+                        `Insufficient quantity available for ${item.productName}`,
+                    );
+                }
+            }
+
+            await transaction.cart.deleteMany({
+                where: {
+                    userId: user.id,
+                    id: {
+                        in: cartIds,
+                    },
+                },
+            });
+
+            return order;
+        });
+
+             return {
+            message: "Order created successfully",
+            orderId,
+            checkoutSessionUrl: "https://res.cloudinary.com/dbpao5h91/image/upload/v1791863901/projects/jmqlhy3afcd1fnbvrccz.png",            
+            transactionId : "transactionId",
+        };
+    }
+
     async createOrderWithCinetPay(user: UserPayload, payload: CreateOrderDto) {
         const shippingAddress =
             await this.prisma.shippingAddress.findUniqueOrThrow({
@@ -314,8 +456,7 @@ export class OrderService {
         return {
             message: "Order created successfully",
             orderId,
-            checkoutSessionUrl: paymentResponse.paymentUrl,
-            paymentUrl: paymentResponse.paymentUrl,
+            checkoutSessionUrl: paymentResponse.paymentUrl,            
             transactionId,
         };
     }

@@ -36,17 +36,20 @@ export class OrderController {
     })
     async createOrder(@Body() payload: CreateOrderDto, @Req() req: Request) {
         const user = req.user as UserPayload;
-        const result = await this.orderService.createOrderWithCinetPay(
+        const result = await this.orderService.createOrderForTesting(
             user,
             payload,
         );
+        // const result = await this.orderService.createOrderWithCinetPay(
+        //     user,
+        //     payload,
+        // );
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
             data: {
                 orderId: result.orderId,
                 checkOutUrl: result.checkoutSessionUrl,
-                paymentUrl: result.paymentUrl,
                 transactionId: result.transactionId,
             },
         });
