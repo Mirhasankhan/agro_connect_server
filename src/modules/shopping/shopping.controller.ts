@@ -84,7 +84,7 @@ export class ShoppingController {
 
     //wishlist related apis
 
-    @Post("add-wishlist/:id")
+    @Post("wishlist-toggle/:id")
     @Roles(UserRole.BUYER)
     @ApiOperation({ summary: "Add Product to Wishlist" })
     async addProductToWishlist(@Param("id") id: string, @Req() req: Request) {
