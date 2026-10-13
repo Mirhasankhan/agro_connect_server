@@ -292,7 +292,8 @@ model Order {
   id                    String        @id @default(auto()) @map("_id") @db.ObjectId
   orderId               String
   customerId            String        @db.ObjectId
-  totalAmount           Float
+  totalAmount           Float  
+  couponCode            String?
   status                OrderStatus   @default(Pending)
   cinetpayTransactionId String?
   paymentStatus         PaymentStatus @default(Pending)

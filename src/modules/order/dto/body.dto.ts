@@ -14,6 +14,9 @@ export class CreateOrderDto {
 
     @IsArray()
     cartIds: string[];
+
+    @IsString()
+    couponCode?: string;
 }
 
 export class OrderQueryDto {

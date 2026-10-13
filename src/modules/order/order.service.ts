@@ -159,6 +159,20 @@ export class OrderService {
     // }
 
     async createOrderForTesting(user: UserPayload, payload: CreateOrderDto) {
+        if (payload.couponCode) {
+            const coupon = await this.prisma.coupon.findUnique({
+                where: { code: payload.couponCode },
+                select: { discount: true, expiresAt: true },
+            });
+
+            if (!coupon) {
+                throw new ApiError(HttpStatus.NOT_FOUND, "Coupon not found");
+            }
+
+            if (new Date() > coupon.expiresAt) {
+                throw new ApiError(HttpStatus.GONE, "Coupon has expired");
+            }
+        }
         const shippingAddress =
             await this.prisma.shippingAddress.findUniqueOrThrow({
                 where: {
@@ -1243,7 +1257,6 @@ export class OrderService {
             message: "Coupon applied successfully",
             data: {
                 discount: coupon.discount,
-              
             },
         };
     }
