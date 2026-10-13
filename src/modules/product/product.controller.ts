@@ -176,4 +176,17 @@ export class ProductController {
             data: result.data,
         });
     }
+
+    @Get("our-best-producers")
+    @OptionalAuth()
+    @ApiOperation({ summary: "Get our best producers" })
+    async getOurBestProducers() {
+        const result = await this.productService.getOurBestProducers();
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
 }

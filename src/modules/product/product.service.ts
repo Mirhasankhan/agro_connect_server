@@ -517,4 +517,88 @@ export class ProductService {
             },
         };
     }
+
+    async getOurBestProducers() {
+        const producers = await this.prisma.user.findMany({
+            where: {
+                role: UserRole.PRODUCER,
+                producerProfile: {
+                    verificationStatus: "Accepted",
+                },
+            },          
+            select: {
+                id: true,
+                fullName: true,
+                profileImage: true,
+                _count: {
+                    select: {
+                        products: true,
+                    },
+                },
+                producerProfile: {
+                    select: {
+                        farmName: true,                     
+                        farmLocation: true,
+                        farmPhotoUrl: true,                        
+                    },
+                },
+            },
+        });
+
+        const products = await this.prisma.product.findMany({
+            where: {
+                producerId: {
+                    in: producers.map((producer) => producer.id),
+                },
+            },
+            select: {
+                producerId: true,
+                avgRating: true,
+                totalReviews: true,
+            },
+        });
+
+        const rankedProducers = producers
+            .map((producer) => {
+                const producerProducts = products.filter(
+                    (product) => product.producerId === producer.id,
+                );
+                const totalReviews = producerProducts.reduce(
+                    (total, product) => total + product.totalReviews,
+                    0,
+                );
+                const avgRating = totalReviews
+                    ? Number(
+                          (
+                              producerProducts.reduce(
+                                  (total, product) =>
+                                      total +
+                                      product.avgRating *
+                                          product.totalReviews,
+                                  0,
+                              ) / totalReviews
+                          ).toFixed(1),
+                      )
+                    : 0;
+
+                return {
+                    ...producer,
+                    avgRating,
+                    totalReviews,
+                };
+            })
+            .sort(
+                (firstProducer, secondProducer) =>
+                    secondProducer.avgRating - firstProducer.avgRating ||
+                    secondProducer.totalReviews - firstProducer.totalReviews,
+            )
+            .slice(0, 5);
+
+        return {
+            message: "Our best producers fetched successfully",
+            data: {
+                producers: rankedProducers,
+            },
+        };
+    }
 }

@@ -28,13 +28,14 @@ model User {
   wishlists         Wishlist[]
   orders            Order[]
   driverProfile     DriverProfile?
-  deliveries        Delivery[]  
+  deliveries        Delivery[]
   conversationsA    Conversation[]    @relation("ConversationParticipantA")
   conversationsB    Conversation[]    @relation("ConversationParticipantB")
   sentMessages      ChatMessage[]     @relation("MessageSender")
   receivedMessages  ChatMessage[]     @relation("MessageReceiver")
   reviews           Review[]
   buyerProfile      BuyerProfile?
+  notifications     Notification[]
 
   @@map("users")
 }
@@ -137,8 +138,8 @@ model DriverProfile {
   vehicleRegistrationUrl String
   insuranceUrl           String
   policeClearanceUrl     String
-  avgRating              Float             @default(0)
-  totalReviews           Int               @default(0)
+  avgRating              Float  @default(0)
+  totalReviews           Int    @default(0)
 
   // Verification
   verificationStatus VerificationStatus @default(Pending)
@@ -304,9 +305,9 @@ model Order {
 
   items OrderItem[]
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  deliveries    Delivery[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deliveries Delivery[]
 
   @@map("orders")
 }
@@ -330,9 +331,9 @@ model OrderItem {
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: NoAction)
 
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  review          Review?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  review    Review?
 
   @@map("orderItems")
 }
@@ -371,6 +372,30 @@ model Review {
   updatedAt DateTime @updatedAt
 
   @@map("reviews")
+}
+
+model Notification {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  receiverId       String            @db.ObjectId
+  content          String
+  title            String
+  isRead           Boolean           @default(false)
+  notificationType TNotificationType
+
+  receiver User @relation(fields: [receiverId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+}
+
+enum TNotificationType {
+  Order
+  Payment
+  Delivery
+  Payout
+  Review
 }
 
 enum OrderStatus {
