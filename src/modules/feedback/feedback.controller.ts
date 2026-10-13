@@ -1,5 +1,11 @@
 import { ResponseService } from "@/common/interceptors/response";
-import { Post, HttpStatus, Get, UploadedFiles, UseInterceptors } from "@nestjs/common";
+import {
+    Post,
+    HttpStatus,
+    Get,
+    UploadedFiles,
+    UseInterceptors,
+} from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { Controller, Body, Req } from "@nestjs/common";
 import { FeedbackService } from "./feedback.service";
@@ -40,10 +46,7 @@ export class FeedbackController {
 
     @Post("support")
     @ApiOperation({ summary: "Send a support request" })
-    @UseInterceptors(
-        CustomFilesInterceptor("files"),
-        ParseFormDataInterceptor,
-    )
+    @UseInterceptors(CustomFilesInterceptor("files"), ParseFormDataInterceptor)
     async sendSupport(
         @Body() payload: SendSupportDto,
         @Req() req: Request,
