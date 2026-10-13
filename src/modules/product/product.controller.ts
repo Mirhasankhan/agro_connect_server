@@ -73,6 +73,20 @@ export class ProductController {
         });
     }
 
+    @Get("top-rated")
+    @OptionalAuth()
+    @ApiOperation({ summary: "Get top rated products" })
+    async getTopRatedProducts(@Req() req: Request) {
+        const user = req.user as UserPayload;
+        const result = await this.productService.getTopRatedProducts(user);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
     @Get("producer-wise")
     @Roles(UserRole.PRODUCER)
     @OptionalAuth()

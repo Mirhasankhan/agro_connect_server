@@ -186,6 +186,53 @@ export class ProductService {
         };
     }
 
+    async getTopRatedProducts(user?: UserPayload) {
+        const products = await this.prisma.product.findMany({
+            where: {
+                isActive: true,               
+            },
+            orderBy: {
+                avgRating: "desc",
+            },
+            take: 5,
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                sellingUnit: true,
+                pricePerUnit: true,
+                availableQuantity: true,
+                imageUrls: true,
+                avgRating: true,
+                totalReviews: true,
+                producer: {
+                    select: {
+                        producerProfile: {
+                            select: {
+                                farmName: true,
+                                companyName: true,
+                                city: true,
+                            },
+                        },
+                    },
+                },
+                wishlists: user?.id
+                    ? {
+                          where: { userId: user.id },
+                          select: { id: true },
+                      }
+                    : false,
+            },
+        });
+
+        return {
+            message: "Top rated products fetched successfully",
+            data: {
+                products,
+            },
+        };
+    }
+
     async getProductById(productId: string, user?: UserPayload) {
         const product = await this.prisma.product.findUniqueOrThrow({
             where: {
