@@ -52,3 +52,8 @@ export class ConfirmDeliveryDto {
     @IsString()
     otp: string;
 }
+
+export class ApplyCouponDto {
+    @IsString()
+    code: string;
+}

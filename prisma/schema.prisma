@@ -338,6 +338,18 @@ model OrderItem {
   @@map("orderItems")
 }
 
+model Coupon {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  code      String   @unique
+  discount  Float
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("coupons")
+}
+
 model Delivery {
   id        String         @id @default(auto()) @map("_id") @db.ObjectId
   orderId   String         @unique @db.ObjectId

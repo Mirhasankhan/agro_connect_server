@@ -3,6 +3,7 @@ import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { CinetPayService } from "@/core/services/cinetpay/cinetpay.service";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import {
+    ApplyCouponDto,
     ConfirmDeliveryDto,
     CreateOrderDto,
     DeliveryDto,
@@ -291,11 +292,12 @@ export class OrderService {
             return order;
         });
 
-             return {
+        return {
             message: "Order created successfully",
             orderId,
-            checkoutSessionUrl: "https://res.cloudinary.com/dbpao5h91/image/upload/v1791863901/projects/jmqlhy3afcd1fnbvrccz.png",            
-            transactionId : "transactionId",
+            checkoutSessionUrl:
+                "https://res.cloudinary.com/dbpao5h91/image/upload/v1791863901/projects/jmqlhy3afcd1fnbvrccz.png",
+            transactionId: "transactionId",
         };
     }
 
@@ -456,7 +458,7 @@ export class OrderService {
         return {
             message: "Order created successfully",
             orderId,
-            checkoutSessionUrl: paymentResponse.paymentUrl,            
+            checkoutSessionUrl: paymentResponse.paymentUrl,
             transactionId,
         };
     }
@@ -1213,6 +1215,36 @@ export class OrderService {
             paymentStatus: order.paymentStatus,
             isPaid: false,
             message: `Transaction status is ${checkResult.status}`,
+        };
+    }
+
+    async applyCoupon(payload: ApplyCouponDto) {
+        const coupon = await this.prisma.coupon.findUnique({
+            where: {
+                code: payload.code,
+            },
+            select: {
+                id: true,
+                code: true,
+                discount: true,
+                expiresAt: true,
+            },
+        });
+
+        if (!coupon) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "Coupon not found");
+        }
+
+        if (new Date() > coupon.expiresAt) {
+            throw new ApiError(HttpStatus.GONE, "Coupon has expired");
+        }
+
+        return {
+            message: "Coupon applied successfully",
+            data: {
+                discount: coupon.discount,
+              
+            },
         };
     }
 }

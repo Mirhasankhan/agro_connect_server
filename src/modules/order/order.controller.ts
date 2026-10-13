@@ -22,7 +22,9 @@ import {
     CreateOrderDto,
     DeliveryDto,
     OrderQueryDto,
+    ApplyCouponDto,
 } from "./dto/body.dto";
+import { IsPublic } from "@/common/decorators/auth.decorator";
 
 @ApiTags("Order")
 @Controller("order")
@@ -198,6 +200,18 @@ export class OrderController {
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
+        });
+    }
+
+    @Post("/apply-coupon")
+    @IsPublic()
+    @ApiOperation({ summary: "Apply a coupon to the current order" })
+    async applyCoupon(@Body() payload: ApplyCouponDto) {
+        const result = await this.orderService.applyCoupon(payload);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
         });
     }
 }

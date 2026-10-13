@@ -9,6 +9,10 @@ import {
     IsString,
     IsMongoId,
     IsEnum,
+    IsNumber,
+    IsDate,
+    Min,
+    Max,
 } from "class-validator";
 
 export class AcceptRejectAccountDto {
@@ -74,4 +78,17 @@ export class AssignDriverDto {
 
     @IsMongoId()
     driverId: string;
+}
+
+export class CreateCouponDto {
+    @IsString()
+    code: string;
+
+    @IsNumber()
+    @Min(1)
+    @Max(99)
+    discount: number;
+
+    @IsDate()
+    expiryDate: Date;
 }

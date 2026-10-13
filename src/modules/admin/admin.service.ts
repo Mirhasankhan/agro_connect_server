@@ -9,6 +9,7 @@ import {
     ProducerQueryDto,
     AssignDriverDto,
     BaseUserQueryDto,
+    CreateCouponDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
@@ -438,6 +439,35 @@ export class AdminService {
 
         return {
             message: "Driver assigned to delivery successfully",
+        };
+    }
+
+    async createNewCoupon(payload: CreateCouponDto) {
+        const existingCoupon = await this.prisma.coupon.findUnique({
+            where: {
+                code: payload.code,
+            },
+            select: {
+                code: true,
+            },
+        });
+
+        if (existingCoupon) {
+            throw new ApiError(
+                HttpStatus.CONFLICT,
+                "Coupon code already exists",
+            );
+        }
+        await this.prisma.coupon.create({
+            data: {
+                code: payload.code,
+                discount: payload.discount,
+                expiresAt: payload.expiryDate,
+            },
+        });
+
+        return {
+            message: "Coupon created successfully",
         };
     }
 }

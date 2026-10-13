@@ -22,6 +22,7 @@ import {
     ProducerQueryDto,
     AssignDriverDto,
     BaseUserQueryDto,
+    CreateCouponDto,
 } from "./dto/body.dto";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
@@ -150,6 +151,17 @@ export class AdminController {
     async assignDriverToDelivery(@Body() payload: AssignDriverDto) {
         const result = await this.adminService.assignDriverToDelivery(payload);
 
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+
+    @Post("create-coupon")
+    @ApiOperation({ summary: "Create new coupon" })
+    @Roles(UserRole.ADMIN)
+    async createNewCoupon(@Body() payload: CreateCouponDto) {
+        const result = await this.adminService.createNewCoupon(payload);
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
