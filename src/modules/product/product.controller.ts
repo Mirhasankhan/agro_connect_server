@@ -59,7 +59,7 @@ export class ProductController {
     }
 
     @Get("all")
-    @Roles(UserRole.PRODUCER, UserRole.BUYER)
+    // @Roles(UserRole.PRODUCER, UserRole.BUYER)
     @OptionalAuth()
     @ApiOperation({ summary: "Get all products" })
     async getAllProducts(@Req() req: Request, @Query() query: ProductQueryDto) {
