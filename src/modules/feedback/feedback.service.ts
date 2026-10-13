@@ -64,4 +64,17 @@ export class FeedbackService {
             message: "Review submitted successfully",
         };
     }
+
+    async getTerms() {
+        const terms = await this.prisma.term.findFirst({
+            select: {
+                content: true,
+            },
+        });
+
+        return {
+            message: "Terms fetched successfully",
+            data: terms,
+        };
+    }
 }

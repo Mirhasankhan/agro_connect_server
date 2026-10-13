@@ -470,4 +470,24 @@ export class AdminService {
             message: "Coupon created successfully",
         };
     }
+
+    async updateTerms(content: string) {
+        const existingTerms = await this.prisma.term.findFirst({});
+        if (!existingTerms) {
+            await this.prisma.term.create({
+                data: {
+                    content,
+                },
+            });
+        }
+
+        await this.prisma.term.update({
+            where: { id: existingTerms.id },
+            data: { content },
+        });
+
+        return {
+            message: "Terms updated successfully",
+        };
+    }
 }

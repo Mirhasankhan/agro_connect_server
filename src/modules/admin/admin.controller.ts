@@ -167,4 +167,15 @@ export class AdminController {
             message: result.message,
         });
     }
+
+    @Patch("update-terms")
+    @ApiOperation({ summary: "Update terms and conditions" })
+    @Roles(UserRole.ADMIN)
+    async updateTerms(@Body("content") content: string) {
+        const result = await this.adminService.updateTerms(content);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
 }

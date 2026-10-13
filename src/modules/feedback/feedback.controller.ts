@@ -1,5 +1,5 @@
 import { ResponseService } from "@/common/interceptors/response";
-import { Post, HttpStatus } from "@nestjs/common";
+import { Post, HttpStatus, Get } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { Controller, Body, Req } from "@nestjs/common";
 import { FeedbackService } from "./feedback.service";
@@ -21,6 +21,18 @@ export class FeedbackController {
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
+        });
+    }
+
+    @Get("terms")
+    @ApiOperation({ summary: "Get Terms and Conditions" })
+    async getTerms() {
+        const result = await this.feedbackService.getTerms();
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
         });
     }
 }

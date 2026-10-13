@@ -292,7 +292,7 @@ model Order {
   id                    String        @id @default(auto()) @map("_id") @db.ObjectId
   orderId               String
   customerId            String        @db.ObjectId
-  totalAmount           Float  
+  totalAmount           Float
   couponCode            String?
   status                OrderStatus   @default(Pending)
   cinetpayTransactionId String?
@@ -402,6 +402,30 @@ model Notification {
 
   @@map("notifications")
 }
+
+model Support {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String   @db.ObjectId
+  subject  String
+  message  String
+  fileurls String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("support")
+}
+model Term {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  content  String  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("terms")
+}
+
+
 
 enum TNotificationType {
   Profile
