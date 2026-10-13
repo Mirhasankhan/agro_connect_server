@@ -10,6 +10,7 @@ import {
     AssignDriverDto,
     BaseUserQueryDto,
     CreateCouponDto,
+    UpdateTermsDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
@@ -471,19 +472,20 @@ export class AdminService {
         };
     }
 
-    async updateTerms(content: string) {
+    async updateTerms(payload: UpdateTermsDto) {
+        console.log("Payload received in updateTerms:", payload);
         const existingTerms = await this.prisma.term.findFirst({});
         if (!existingTerms) {
             await this.prisma.term.create({
                 data: {
-                    content,
+                    content: payload.content,
                 },
             });
         }
 
         await this.prisma.term.update({
             where: { id: existingTerms.id },
-            data: { content },
+            data: { content: payload.content },
         });
 
         return {

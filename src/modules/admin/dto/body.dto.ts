@@ -92,3 +92,8 @@ export class CreateCouponDto {
     @IsDate()
     expiryDate: Date;
 }
+
+export class UpdateTermsDto {
+    @IsString()
+    content: string;
+}

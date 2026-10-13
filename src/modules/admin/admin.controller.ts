@@ -23,6 +23,7 @@ import {
     AssignDriverDto,
     BaseUserQueryDto,
     CreateCouponDto,
+    UpdateTermsDto,
 } from "./dto/body.dto";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
@@ -171,7 +172,7 @@ export class AdminController {
     @Patch("update-terms")
     @ApiOperation({ summary: "Update terms and conditions" })
     @Roles(UserRole.ADMIN)
-    async updateTerms(@Body("content") content: string) {
+    async updateTerms(@Body() content: UpdateTermsDto) {
         const result = await this.adminService.updateTerms(content);
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
