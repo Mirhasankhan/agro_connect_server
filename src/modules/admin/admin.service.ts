@@ -473,7 +473,6 @@ export class AdminService {
     }
 
     async updateTerms(payload: UpdateTermsDto) {
-        console.log("Payload received in updateTerms:", payload);
         const existingTerms = await this.prisma.term.findFirst({});
         if (!existingTerms) {
             await this.prisma.term.create({

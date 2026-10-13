@@ -1,11 +1,13 @@
 import { ResponseService } from "@/common/interceptors/response";
-import { Post, HttpStatus, Get } from "@nestjs/common";
+import { Post, HttpStatus, Get, UploadedFiles, UseInterceptors } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { Controller, Body, Req } from "@nestjs/common";
 import { FeedbackService } from "./feedback.service";
-import { CreateReviewDto } from "./dto/body.dto";
+import { CreateReviewDto, SendSupportDto } from "./dto/body.dto";
 import { UserPayload } from "@/common/guards/auth.guard";
 import { Request } from "express";
+import { CustomFilesInterceptor } from "@/common/interceptors/file_interceptors";
+import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
 
 @ApiTags("Feedback")
 @Controller("feedback")
@@ -33,6 +35,30 @@ export class FeedbackController {
             statusCode: HttpStatus.OK,
             message: result.message,
             data: result.data,
+        });
+    }
+
+    @Post("support")
+    @ApiOperation({ summary: "Send a support request" })
+    @UseInterceptors(
+        CustomFilesInterceptor("files"),
+        ParseFormDataInterceptor,
+    )
+    async sendSupport(
+        @Body() payload: SendSupportDto,
+        @Req() req: Request,
+        @UploadedFiles() files?: Express.Multer.File[],
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.feedbackService.sendSupport(
+            user,
+            payload,
+            files,
+        );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
         });
     }
 }

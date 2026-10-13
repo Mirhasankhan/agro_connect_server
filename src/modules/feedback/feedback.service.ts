@@ -1,12 +1,16 @@
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { Injectable, HttpStatus } from "@nestjs/common";
 import { UserPayload } from "@/common/guards/auth.guard";
-import { CreateReviewDto } from "./dto/body.dto";
+import { FileService } from "@/core/services/files/cloudinary.service";
+import { CreateReviewDto, SendSupportDto } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 
 @Injectable()
 export class FeedbackService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private fileService: FileService,
+    ) {}
 
     async submitReview(user: UserPayload, payload: CreateReviewDto) {
         await this.prisma.$transaction(async (tx) => {
@@ -75,6 +79,33 @@ export class FeedbackService {
         return {
             message: "Terms fetched successfully",
             data: terms,
+        };
+    }
+
+    async sendSupport(
+        user: UserPayload,
+        payload: SendSupportDto,
+        files: Express.Multer.File[] = [],
+    ) {
+        const fileurls = files.length
+            ? await Promise.all(
+                  files.map((file) =>
+                      this.fileService.uploadToCloudinary(file, "support"),
+                  ),
+              )
+            : [];
+
+        await this.prisma.support.create({
+            data: {
+                userId: user.id,
+                subject: payload.subject,
+                message: payload.message,
+                fileurls,
+            },
+        });
+
+        return {
+            message: "Support request sent successfully",
         };
     }
 }
