@@ -132,6 +132,12 @@ model DriverProfile {
   vehicleType        DriverVehicleType
   registrationNumber String
 
+  //
+  vehiclePhotoUrl String
+  model           String
+  year            Int
+  vehicleColor    String
+
   //driver urls
   nidUrl                 String
   drivingLicenseUrl      String
@@ -415,17 +421,16 @@ model Support {
 
   @@map("support")
 }
+
 model Term {
-  id       String   @id @default(auto()) @map("_id") @db.ObjectId
-  content  String  
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  content String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("terms")
 }
-
-
 
 enum TNotificationType {
   Profile

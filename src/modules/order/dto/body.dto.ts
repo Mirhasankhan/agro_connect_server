@@ -2,11 +2,14 @@ import {
     IsArray,
     IsMongoId,
     IsOptional,
-    IsString,
-    IsEnum,
+    IsString,  
     IsIn,
+    IsNumber,
+    Min,
+    Max,
 } from "class-validator";
-import { OrderStatus, PaymentStatus } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
+import { Type } from "class-transformer";
 
 export class CreateOrderDto {
     @IsMongoId()
@@ -25,12 +28,10 @@ export class OrderQueryDto {
     search?: string;
 
     @IsOptional()
-    @IsEnum(OrderStatus)
+    @IsIn(["Active", "Delivered", "Cancelled"])
     status?: OrderStatus;
 
-    @IsOptional()
-    @IsEnum(PaymentStatus)
-    paymentStatus?: PaymentStatus;
+
 
     @IsOptional()
     @IsString()
@@ -59,4 +60,21 @@ export class ConfirmDeliveryDto {
 export class ApplyCouponDto {
     @IsString()
     code: string;
+}
+
+export class StartNavigationDto {
+    @IsMongoId()
+    deliveryId: string;
+
+    @Type(() => Number)
+    @IsNumber()
+    @Min(-90)
+    @Max(90)
+    latitude: number;
+
+    @Type(() => Number)
+    @IsNumber()
+    @Min(-180)
+    @Max(180)
+    longitude: number;
 }

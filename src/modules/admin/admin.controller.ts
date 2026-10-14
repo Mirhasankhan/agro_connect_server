@@ -28,6 +28,7 @@ import {
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
 import { IsPublic } from "@/common/decorators/auth.decorator";
+import { OrderQueryDto } from "../order/dto/body.dto";
 
 @ApiTags("Admin")
 @Controller("admin")
@@ -177,6 +178,30 @@ export class AdminController {
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
+        });
+    }
+
+    @Get("all-orders")
+    @ApiOperation({ summary: "All orders" })
+    @Roles(UserRole.ADMIN)
+    async allOrders(@Query() query: OrderQueryDto) {
+        const result = await this.adminService.getAllOrdersFromDB(query);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("order/:id")
+    @ApiOperation({ summary: "Get order by ID" })
+    @Roles(UserRole.ADMIN)
+    async getOrderById(@Param("id") orderId: string) {
+        const result = await this.adminService.getOrderById(orderId);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
         });
     }
 }

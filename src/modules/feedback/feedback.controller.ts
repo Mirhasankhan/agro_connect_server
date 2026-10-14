@@ -14,6 +14,8 @@ import { UserPayload } from "@/common/guards/auth.guard";
 import { Request } from "express";
 import { CustomFilesInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
+import { Roles } from "@/common/decorators/roles.decorator";
+import { UserRole } from "@prisma/client";
 
 @ApiTags("Feedback")
 @Controller("feedback")
@@ -46,6 +48,7 @@ export class FeedbackController {
 
     @Post("support")
     @ApiOperation({ summary: "Send a support request" })
+    @Roles(UserRole.BUYER, UserRole.DRIVER, UserRole.PRODUCER)
     @UseInterceptors(CustomFilesInterceptor("files"), ParseFormDataInterceptor)
     async sendSupport(
         @Body() payload: SendSupportDto,

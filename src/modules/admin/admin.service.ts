@@ -14,6 +14,7 @@ import {
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
+import { OrderQueryDto } from "../order/dto/body.dto";
 
 @Injectable()
 export class AdminService {
@@ -489,6 +490,168 @@ export class AdminService {
 
         return {
             message: "Terms updated successfully",
+        };
+    }
+
+    async getAllOrdersFromDB(query: OrderQueryDto) {
+        const queryBuilder = new QueryBuilder(this.prisma.order, query);
+
+        const response = queryBuilder
+            .search(["orderId", "customer.fullName", "customer.email"])
+            .sort()
+            .filter({ exacts: ["status"] })
+            .rawFilter({
+                paymentStatus: "Paid",
+            })
+            .paginate()
+            .select({
+                id: true,
+                orderId: true,
+                status: true,
+                totalAmount: true,
+                createdAt: true,
+                _count: {
+                    select: {
+                        items: true,
+                    },
+                },
+                customer: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        profileImage: true,
+                    },
+                },
+            });
+
+        const [allOrders, pagination, completed, cancelled] = await Promise.all(
+            [
+                response.execute(),
+                response.countTotal(),
+                this.prisma.order.count({
+                    where: {
+                        status: "Delivered",
+                        paymentStatus: "Paid",
+                    },
+                }),
+                this.prisma.order.count({
+                    where: {
+                        status: "Cancelled",
+                        paymentStatus: "Paid",
+                    },
+                }),
+            ],
+        );
+
+        const totalAmount = await this.prisma.order.aggregate({
+            where: {
+                paymentStatus: "Paid",
+            },
+            _sum: {
+                totalAmount: true,
+            },
+        });
+
+        return {
+            message: "All orders fetched successfully",
+            data: {
+                orders: allOrders,
+                meta: {
+                    ...pagination,
+                    completed,
+                    cancelled,
+                    totalAmount: totalAmount._sum.totalAmount ?? 0,
+                },
+            },
+        };
+    }
+
+    async getOrderById(orderId: string) {
+        const order = await this.prisma.order.findUniqueOrThrow({
+            where: {
+                id: orderId,
+            },
+            select: {
+                id: true,
+                orderId: true,
+                status: true,
+                createdAt: true,
+                totalAmount: true,
+                cancelReason: true,
+                customer: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        profileImage: true,
+                    },
+                },
+                shippingAddress: {
+                    select: {
+                        addressLine: true,
+                        city: true,
+                        instruction: true,
+                        postCode: true,
+                    },
+                },             
+                items: {
+                    select: {
+                        id: true,
+                        productName: true,
+                        quantity: true,
+                        unitPrice: true,
+                        subtotal: true,
+                        sellingUnit: true,
+                        product: {
+                            select: {
+                                imageUrls: true,
+                                producer: {
+                                    select: {
+                                        fullName: true,
+                                        profileImage: true,
+                                        producerProfile: {
+                                            select: {
+                                                farmName: true,
+                                                address: true,
+                                                city: true,
+                                                farmSize: true,
+                                                producerType: true,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                deliveries: {
+                    select: {
+                        id: true,
+                        status: true,
+                        latitude: true,
+                        longitude: true,
+                        driver: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                email: true,
+                                profileImage: true,
+                                driverProfile: {
+                                    select: {
+                                        registrationNumber: true,
+                                        vehicleType: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        return {
+            message: "Order fetched successfully",
+            data: order,
         };
     }
 }

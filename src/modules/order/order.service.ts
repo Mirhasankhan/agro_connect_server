@@ -8,6 +8,7 @@ import {
     CreateOrderDto,
     DeliveryDto,
     OrderQueryDto,
+    StartNavigationDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import QueryBuilder from "@/common/utils/queryBuilder";
@@ -582,7 +583,7 @@ export class OrderService {
         const response = queryBuilder
             .search(["orderId"])
             .filter({
-                exacts: ["status", "paymentStatus"],
+                exacts: ["status"],
             })
             .rawFilter({
                 customerId: user.id,
@@ -1259,5 +1260,9 @@ export class OrderService {
                 discount: coupon.discount,
             },
         };
+    }
+
+    async startNavigation(user: UserPayload, payload: StartNavigationDto) {
+
     }
 }
