@@ -15,12 +15,15 @@ import {
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
 import { OrderQueryDto } from "../order/dto/body.dto";
+import { background } from "@/common/utils/background";
+import { NotificationService } from "../notification/notification.service";
 
 @Injectable()
 export class AdminService {
     constructor(
         private prisma: PrismaService,
         private fileService: FileService,
+        private notificationService: NotificationService,
     ) {}
 
     async getAllProducerFromDB(query: ProducerQueryDto) {
@@ -276,6 +279,15 @@ export class AdminService {
                 verificationStatus: payload.isAccept ? "Accepted" : "Rejected",
                 rejectionReason: payload.isAccept ? null : payload.rejectReason,
             },
+        });
+
+        background.add(async () => {
+            await this.notificationService.createNotification({
+                receiverId: payload.accountId,
+                title: `Your driver profile has been ${payload.isAccept ? "accepted" : "rejected"}`,
+                content: `Your driver profile has been ${payload.isAccept ? "accepted" : "rejected"} by the admin. ${payload.isAccept ? "" : `Reason: ${payload.rejectReason}`}`,
+                notificationType: "Profile",
+            });
         });
 
         return {
@@ -659,4 +671,6 @@ export class AdminService {
             data: order,
         };
     }
+
+
 }

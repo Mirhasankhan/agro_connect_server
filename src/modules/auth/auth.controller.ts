@@ -367,4 +367,19 @@ export class AuthController {
             data: result.data,
         });
     }
+
+
+    @Get("driver-home-data")
+    @Roles(UserRole.DRIVER)
+    @ApiOperation({ summary: "Get driver home data" })
+    async getDriverHomeData(@Req() req: Request) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.getDriverHomeData(user);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
 }

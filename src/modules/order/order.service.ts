@@ -988,6 +988,61 @@ export class OrderService {
         };
     }
 
+    async applyCoupon(payload: ApplyCouponDto) {
+        const coupon = await this.prisma.coupon.findUnique({
+            where: {
+                code: payload.code,
+            },
+            select: {
+                id: true,
+                code: true,
+                discount: true,
+                expiresAt: true,
+            },
+        });
+
+        if (!coupon) {
+            throw new ApiError(HttpStatus.NOT_FOUND, "Coupon not found");
+        }
+
+        if (new Date() > coupon.expiresAt) {
+            throw new ApiError(HttpStatus.GONE, "Coupon has expired");
+        }
+
+        return {
+            message: "Coupon applied successfully",
+            data: {
+                discount: coupon.discount,
+            },
+        };
+    }
+
+    async updateNavigation(user: UserPayload, payload: StartNavigationDto) {
+        const delivery = await this.prisma.delivery.findUniqueOrThrow({
+            where: {
+                id: payload.deliveryId,
+                driverId: user.id,
+                status: "PickedUp",
+            },
+            select: { id: true },
+        });
+
+        await this.prisma.delivery.update({
+            where: {
+                id: delivery.id,
+            },
+            data: {
+                latitude: payload.latitude,
+                longitude: payload.longitude,
+                status: "InTransit",
+            },
+        });
+
+        return {
+            message: "Navigation updated successfully",
+        };
+    }
+
     // --- CinetPay Webhook and Payment Verification Handlers ---
 
     async handleCinetPayWebhook(payload: Record<string, unknown>) {
@@ -1254,60 +1309,6 @@ export class OrderService {
             paymentStatus: order.paymentStatus,
             isPaid: false,
             message: `Transaction status is ${checkResult.status}`,
-        };
-    }
-
-    async applyCoupon(payload: ApplyCouponDto) {
-        const coupon = await this.prisma.coupon.findUnique({
-            where: {
-                code: payload.code,
-            },
-            select: {
-                id: true,
-                code: true,
-                discount: true,
-                expiresAt: true,
-            },
-        });
-
-        if (!coupon) {
-            throw new ApiError(HttpStatus.NOT_FOUND, "Coupon not found");
-        }
-
-        if (new Date() > coupon.expiresAt) {
-            throw new ApiError(HttpStatus.GONE, "Coupon has expired");
-        }
-
-        return {
-            message: "Coupon applied successfully",
-            data: {
-                discount: coupon.discount,
-            },
-        };
-    }
-
-    async updateNavigation(user: UserPayload, payload: StartNavigationDto) {
-        const delivery = await this.prisma.delivery.findUniqueOrThrow({
-            where: {
-                id: payload.deliveryId,
-                driverId: user.id,
-                status: "PickedUp",
-            },
-            select: { id: true },
-        });
-
-        await this.prisma.delivery.update({
-            where: {
-                id: delivery.id,
-            },
-            data: {
-                latitude: payload.latitude,
-                longitude: payload.longitude,
-            },
-        });
-
-        return {
-            message: "Navigation updated successfully",
         };
     }
 }

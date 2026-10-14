@@ -463,6 +463,7 @@ enum DeliveryStatus {
   Assigned
   PickedUp
   Delivered
+  InTransit
 }
 
 enum PaymentStatus {

@@ -1123,4 +1123,59 @@ export class AuthService {
             data: userData,
         };
     }
+
+        async getDriverHomeData(user: UserPayload) {
+        const driver = await this.prisma.driverProfile.findUniqueOrThrow({
+            where: {
+                userId: user.id,
+            },
+            select: {
+                user: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        profileImage: true,
+                        deliveries: {
+                            take: 2,
+                            select: {
+                                id:true,
+                                orderId:true,
+                                status:true,
+                                createdAt:true,
+                                order: {
+                                    select : {
+                                        totalAmount:true,
+                                        shippingAddress: {
+                                            select : {
+                                                addressLine:true,
+                                                city:true,                                                
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        _count: {
+                            select: {
+                                deliveries: true,
+                                notifications: {
+                                    where: { isRead: false },
+                                },
+                            },
+                        },
+                    },
+                },
+                allTimeEarnings: true,
+                avgRating: true,
+                totalReviews: true,
+                currentEarnings: true,
+                isAvailable: true,
+            },
+        });
+
+        return {
+            message: "Driver home data fetched successfully",
+            data: driver,
+        };
+    }
 }
