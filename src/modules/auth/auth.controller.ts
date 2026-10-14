@@ -382,4 +382,17 @@ export class AuthController {
             data: result.data,
         });
     }
+
+    @Put("toggle-online-status")
+    @Roles(UserRole.DRIVER)
+    @ApiOperation({ summary: "Toggle driver online status" })
+    async toggleOnlineStatus(@Req() req: Request) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.toggleOnlineStatus(user);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
 }

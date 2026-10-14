@@ -1124,7 +1124,7 @@ export class AuthService {
         };
     }
 
-        async getDriverHomeData(user: UserPayload) {
+    async getDriverHomeData(user: UserPayload) {
         const driver = await this.prisma.driverProfile.findUniqueOrThrow({
             where: {
                 userId: user.id,
@@ -1138,22 +1138,22 @@ export class AuthService {
                         deliveries: {
                             take: 2,
                             select: {
-                                id:true,
-                                orderId:true,
-                                status:true,
-                                createdAt:true,
+                                id: true,
+                                orderId: true,
+                                status: true,
+                                createdAt: true,
                                 order: {
-                                    select : {
-                                        totalAmount:true,
+                                    select: {
+                                        totalAmount: true,
                                         shippingAddress: {
-                                            select : {
-                                                addressLine:true,
-                                                city:true,                                                
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                                            select: {
+                                                addressLine: true,
+                                                city: true,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                         _count: {
                             select: {
@@ -1176,6 +1176,47 @@ export class AuthService {
         return {
             message: "Driver home data fetched successfully",
             data: driver,
+        };
+    }
+
+    async toggleOnlineStatus(user: UserPayload) {
+        const [driver, deliveries] = await this.prisma.$transaction([
+            this.prisma.driverProfile.findUniqueOrThrow({
+                where: {
+                    userId: user.id,
+                },
+                select: {
+                    isAvailable: true,
+                },
+            }),
+            this.prisma.delivery.findFirst({
+                where: {
+                    driverId: user.id,
+                    status: {
+                        in: ["Assigned", "InTransit", "PickedUp"],
+                    },
+                },
+            }),
+        ]);
+
+        if (!driver.isAvailable && deliveries) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "Cannot go online while having active deliveries",
+            );
+        }
+
+        await this.prisma.driverProfile.update({
+            where: {
+                userId: user.id,
+            },
+            data: {
+                isAvailable: !driver.isAvailable,
+            },
+        });
+
+        return {
+            message: `Youra are now ${!driver.isAvailable ? "online" : "offline"}`,
         };
     }
 }
