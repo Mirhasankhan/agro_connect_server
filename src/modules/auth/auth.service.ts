@@ -1219,4 +1219,64 @@ export class AuthService {
             message: `Youra are now ${!driver.isAvailable ? "online" : "offline"}`,
         };
     }
+
+    async getProducerHomeData(user: UserPayload) {
+        const producer = await this.prisma.user.findUniqueOrThrow({
+            where: {
+                id: user.id,
+            },
+            select: {
+                id: true,
+                fullName: true,
+                profileImage: true,
+                producerProfile: {
+                    select: {
+                        verificationStatus: true,
+                        allTimeEarnings: true,
+                    },
+                },
+                products: {
+                    take: 3,
+                    select: {
+                        id: true,
+                        name: true,
+                        imageUrls: true,
+                        sellingUnit: true,
+                        availableQuantity: true,
+                        sold: true,
+                        avgRating: true,
+                        category: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                },
+                _count: {
+                    select: {
+                        notifications: {
+                            where: { isRead: false },
+                        },
+                        products: {
+                            where: { isActive: true },
+                        },
+                    },
+                },
+            },
+        });
+
+        const activerOrderItems = await this.prisma.orderItem.count({
+            where: {
+                product: {
+                    producerId: user.id,
+                },
+            },
+        });
+
+        return {
+            message: "Producer home data fetched successfully",
+            data: producer,
+            activeOrderItems: activerOrderItems,
+        };
+    }
 }

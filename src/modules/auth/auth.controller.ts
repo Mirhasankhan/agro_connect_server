@@ -402,6 +402,21 @@ export class AuthController {
         });
     }
 
+
+    @Get("producer-home-data")
+    @Roles(UserRole.PRODUCER)
+    @ApiOperation({ summary: "Get producer home data" })
+    async getProducerHomeData(@Req() req: Request) {
+        const user = req.user as UserPayload;
+        const result = await this.authService.getProducerHomeData(user);
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
     @Put("toggle-online-status")
     @Roles(UserRole.DRIVER)
     @ApiOperation({ summary: "Toggle driver online status" })
