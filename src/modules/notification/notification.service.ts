@@ -2,6 +2,7 @@ import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { TNotificationType } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { UserPayload } from "@/common/guards/auth.guard";
+import QueryBuilder from "@/common/utils/queryBuilder";
 
 export interface CreateNotificationInput {
     receiverId: string;
@@ -20,16 +21,40 @@ export class NotificationService {
         });
     }
 
-    async getNotificationsByReceiverId(user: UserPayload) {
-        const notifications = await this.prisma.notification.findMany({
+    async getNotificationsByReceiverId(user: UserPayload, query) {
+        const queryBuilder = new QueryBuilder(this.prisma.notification, query);
+
+        const response = await queryBuilder
+            .filter({
+                exacts: ["notificationType"],
+            })
+            .rawFilter({
+                receiverId: user.id,
+            })
+            .sortBy({ createdAt: "desc" })
+            .paginate()            
+            .execute();
+
+        await this.prisma.notification.updateMany({
             where: {
                 receiverId: user.id,
+                isRead: false,
+            },
+            data: {
+                isRead: true,
             },
         });
+
+        const [notifications, pagination] = await Promise.all([
+            response,
+            queryBuilder.countTotal(),
+        ]);
+
         return {
             message: "Notifications fetched successfully",
             data: {
                 notifications,
+                meta: pagination,
             },
         };
     }

@@ -10,7 +10,7 @@ import {
     IsBoolean,
     IsIn,
 } from "class-validator";
-import { SellingUnit } from "@prisma/client";
+import { SellingUnit,TNotificationType } from "@prisma/client";
 
 export class ProductDto {
     @IsString()
@@ -132,4 +132,11 @@ export class UpdateProductImagesDto {
     @IsArray()
     @IsString({ each: true })
     keptImages?: string[];
+}
+
+export class NotificationQueryDto {
+    
+    @IsOptional()
+    @IsEnum(TNotificationType)
+    notificationType?: TNotificationType;
 }
