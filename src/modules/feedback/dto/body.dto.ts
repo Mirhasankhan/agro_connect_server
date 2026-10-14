@@ -19,6 +19,18 @@ export class CreateReviewDto {
     @IsMongoId()
     orderItemId: string;
 }
+export class CreateDriverReviewDto {
+    @IsNumber()
+    @Min(1)
+    @Max(5)
+    rating: number;
+
+    @IsString()
+    comment: string;
+
+    @IsMongoId()
+    orderId: string;
+}
 
 export class SendSupportDto {
     @IsString()

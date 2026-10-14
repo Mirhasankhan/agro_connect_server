@@ -36,6 +36,7 @@ model User {
   reviews           Review[]
   buyerProfile      BuyerProfile?
   notifications     Notification[]
+  driverReviews     DriverReview[]
 
   @@map("users")
 }
@@ -312,9 +313,10 @@ model Order {
 
   items OrderItem[]
 
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  deliveries Delivery[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deliveries   Delivery[]
+  driverReview DriverReview?
 
   @@map("orders")
 }
@@ -391,6 +393,21 @@ model Review {
   updatedAt DateTime @updatedAt
 
   @@map("reviews")
+}
+
+model DriverReview {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  buyerId String @db.ObjectId
+  orderId String @unique @db.ObjectId
+  rating  Int
+  comment String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer   User   @relation(fields: [buyerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("driverReviews")
 }
 
 model Notification {

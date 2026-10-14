@@ -9,7 +9,11 @@ import {
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { Controller, Body, Req } from "@nestjs/common";
 import { FeedbackService } from "./feedback.service";
-import { CreateReviewDto, SendSupportDto } from "./dto/body.dto";
+import {
+    CreateDriverReviewDto,
+    CreateReviewDto,
+    SendSupportDto,
+} from "./dto/body.dto";
 import { UserPayload } from "@/common/guards/auth.guard";
 import { Request } from "express";
 import { CustomFilesInterceptor } from "@/common/interceptors/file_interceptors";
@@ -60,6 +64,25 @@ export class FeedbackController {
             user,
             payload,
             files,
+        );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+        });
+    }
+
+    @Post("driver-review")
+    @ApiOperation({ summary: "Submit Review to a Driver" })
+    @Roles(UserRole.BUYER)
+    async createDriverReview(
+        @Body() payload: CreateDriverReviewDto,
+        @Req() req: Request,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.feedbackService.createDriverReview(
+            user,
+            payload,
         );
 
         return ResponseService.formatResponse({
