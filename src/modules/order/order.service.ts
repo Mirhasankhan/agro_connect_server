@@ -761,9 +761,9 @@ export class OrderService {
                                 driverProfile: {
                                     select: {
                                         vehicleType: true,
-                                        vehicleModel: true,
+                                        model: true,
                                         vehicleColor: true,
-                                        vehiclePhotoUrls: true,
+                                        vehiclePhotoUrl: true,
                                     },
                                 },
                             },

@@ -80,6 +80,7 @@ export class WebsocketGateway
             this.presence.add(userId, socket.id);
 
             socket.emit("authenticated", { userId, message: "Authenticated" });
+            await this.emitConversationList(userId);
         } catch (err) {
             this.logger.warn(
                 `Socket ${socket.id} auth failed: ${(err as Error).message}`,
@@ -130,6 +131,7 @@ export class WebsocketGateway
                 },
                 data: { isRead: true },
             });
+            await this.emitConversationList(userId);
 
             const messages = await this.prisma.chatMessage.findMany({
                 where: { conversationId: conversation.id },
@@ -243,8 +245,87 @@ export class WebsocketGateway
                     isSendByMe: senderId === targetSocket.data.userId,
                 });
             }
+
+            await Promise.all([
+                this.emitConversationList(senderId),
+                this.emitConversationList(payload.receiverId),
+            ]);
         } catch (err) {
             this.handleError(socket, err, "sendMessage");
+        }
+    }
+
+    private async emitConversationList(userId: string) {
+        const sockets = await this.server.fetchSockets();
+        const userSockets = sockets.filter(
+            (socket) => socket.data.userId === userId,
+        );
+
+        if (userSockets.length === 0) return;
+
+        const conversations = await this.prisma.conversation.findMany({
+            where: {
+                OR: [{ participantA: userId }, { participantB: userId }],
+            },
+            orderBy: { updatedAt: "desc" },
+            include: {
+                participantAUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        profileImage: true,
+                    },
+                },
+                participantBUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        profileImage: true,
+                    },
+                },
+                messages: {
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: {
+                        message: true,
+                        images: true,
+                        createdAt: true,
+                    },
+                },
+            },
+        });
+
+        const conversationList = await Promise.all(
+            conversations.map(async (conversation) => {
+                const participant =
+                    conversation.participantA === userId
+                        ? conversation.participantBUser
+                        : conversation.participantAUser;
+                const participantId =
+                    conversation.participantA === userId
+                        ? conversation.participantB
+                        : conversation.participantA;
+                const unreadCount = await this.prisma.chatMessage.count({
+                    where: {
+                        conversationId: conversation.id,
+                        receiverId: userId,
+                        isRead: false,
+                    },
+                });
+
+                return {
+                    participant: {
+                        ...participant,
+                        isOnline: this.presence.isOnline(participantId),
+                    },
+                    lastMessage: conversation.messages[0] || null,
+                    unreadCount,
+                };
+            }),
+        );
+
+        for (const socket of userSockets) {
+            socket.emit("conversationList", conversationList);
         }
     }
 
