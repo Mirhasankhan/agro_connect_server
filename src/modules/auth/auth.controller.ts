@@ -16,6 +16,7 @@ import { IsPublic } from "@/common/decorators/auth.decorator";
 import { Request } from "express";
 import { ResponseService } from "@/common/interceptors/response";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import {
     ChangePasswordDto,
     CreateBuyerProfileDto,
@@ -43,9 +44,12 @@ import { UserRole } from "@prisma/client";
 @ApiTags("Auth")
 @Controller("auth")
 export class AuthController {
-    constructor(private authService: AuthService) {}
+    constructor(private authService: AuthService) { }
 
     @IsPublic()
+    @Throttle({
+        short: { limit: 2, ttl: 60000, blockDuration: 60000 },
+    })
     @Post("register")
     @ApiOperation({ summary: "Register User" })
     async register(@Body() payload: RegisterUserDto) {
@@ -70,6 +74,9 @@ export class AuthController {
     }
 
     @IsPublic()
+    @Throttle({
+        short: { limit: 3, ttl: 60000, blockDuration: 60000 },
+    })
     @Post("login")
     @ApiOperation({ summary: "Login User" })
     async loginWithEmail(@Body() payload: LoginUserDto) {
@@ -80,9 +87,12 @@ export class AuthController {
             message: result.message,
             data: result.data,
         });
-    } 
+    }
 
     @IsPublic()
+    @Throttle({
+        short: { limit: 2, ttl: 60000, blockDuration: 60000 },
+    })
     @Post("send-otp/password-reset")
     @ApiOperation({ summary: "Forgot Password OTP" })
     async sendForgotPasswordOtp(@Body() payload: SendForgotPasswordOtpDto) {
@@ -154,6 +164,9 @@ export class AuthController {
         });
     }
 
+    @Throttle({
+        short: { limit: 2, ttl: 60000, blockDuration: 60000 },
+    })
     @Post("create-producer-profile")
     @Roles(UserRole.PRODUCER)
     @UseInterceptors(
@@ -194,6 +207,9 @@ export class AuthController {
         });
     }
 
+    @Throttle({
+        short: { limit: 2, ttl: 60000, blockDuration: 60000 },
+    })
     @Put("update-producer-profile")
     @Roles(UserRole.PRODUCER)
     @UseInterceptors(
@@ -234,6 +250,9 @@ export class AuthController {
         });
     }
 
+    @Throttle({
+        short: { limit: 2, ttl: 60000, blockDuration: 60000 },
+    })
     @Post("create-driver-profile")
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
