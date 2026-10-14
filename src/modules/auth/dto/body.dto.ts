@@ -5,9 +5,13 @@ import {
     IsOptional,
     IsEnum,
     IsNotEmpty,
+    IsInt,
     IsNumber,
     IsPhoneNumber,
+    Min,
+    Max,
 } from "class-validator";
+import { PartialType } from "@nestjs/mapped-types";
 import { UserRole, ProducerType, DriverVehicleType } from "@prisma/client";
 
 export class RegisterUserDto {
@@ -190,4 +194,21 @@ export class CreateDriverProfileDto {
     @IsString()
     @IsNotEmpty()
     registrationNumber: string;
+
+    @IsString()
+    @IsNotEmpty()
+    model: string;
+
+    @IsInt()
+    @Min(1900)
+    @Max(2026)
+    year: number;
+
+    @IsString()
+    @IsNotEmpty()
+    vehicleColor: string;
 }
+
+export class UpdateDriverProfileDto extends PartialType(
+    CreateDriverProfileDto,
+) {}

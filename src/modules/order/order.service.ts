@@ -746,6 +746,30 @@ export class OrderService {
                         },
                     },
                 },
+                deliveries: {
+                    select: {
+                        id: true,
+                        status: true,
+                        latitude: true,
+                        longitude: true,
+                        updatedAt: true,
+                        driver: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                profileImage: true,
+                                driverProfile: {
+                                    select: {
+                                        vehicleType: true,
+                                        vehicleModel: true,
+                                        vehicleColor: true,
+                                        vehiclePhotoUrls: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
             },
         });
         return {
@@ -1262,7 +1286,28 @@ export class OrderService {
         };
     }
 
-    async startNavigation(user: UserPayload, payload: StartNavigationDto) {
+    async updateNavigation(user: UserPayload, payload: StartNavigationDto) {
+        const delivery = await this.prisma.delivery.findUniqueOrThrow({
+            where: {
+                id: payload.deliveryId,
+                driverId: user.id,
+                status: "PickedUp",
+            },
+            select: { id: true },
+        });
 
+        await this.prisma.delivery.update({
+            where: {
+                id: delivery.id,
+            },
+            data: {
+                latitude: payload.latitude,
+                longitude: payload.longitude,
+            },
+        });
+
+        return {
+            message: "Navigation updated successfully",
+        };
     }
 }

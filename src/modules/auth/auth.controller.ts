@@ -26,6 +26,7 @@ import {
     RegisterUserDto,
     ResetPasswordDto,
     SendForgotPasswordOtpDto,
+    UpdateDriverProfileDto,
     updateUserDto,
     VerifyForgotPasswordOtpDto,
     VerifyRegistrationDto,
@@ -237,6 +238,7 @@ export class AuthController {
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
         CustomFileFieldsInterceptor([
+            { name: "vehiclePhotoUrl", maxCount: 1 },
             { name: "drivingLicenseUrl", maxCount: 1 },
             { name: "vehicleRegistrationUrl", maxCount: 1 },
             { name: "insuranceUrl", maxCount: 1 },
@@ -251,6 +253,7 @@ export class AuthController {
         @Req() req: Request,
         @UploadedFiles()
         files?: {
+            vehiclePhotoUrl?: Express.Multer.File[];
             drivingLicenseUrl?: Express.Multer.File[];
             vehicleRegistrationUrl?: Express.Multer.File[];
             insuranceUrl?: Express.Multer.File[];
@@ -274,6 +277,7 @@ export class AuthController {
     @Roles(UserRole.DRIVER)
     @UseInterceptors(
         CustomFileFieldsInterceptor([
+            { name: "vehiclePhotoUrl", maxCount: 1 },
             { name: "drivingLicenseUrl", maxCount: 1 },
             { name: "vehicleRegistrationUrl", maxCount: 1 },
             { name: "insuranceUrl", maxCount: 1 },
@@ -284,10 +288,11 @@ export class AuthController {
     )
     @ApiOperation({ summary: "Update Driver Profile" })
     async updateDriverProfile(
-        @Body() payload: CreateDriverProfileDto,
+        @Body() payload: UpdateDriverProfileDto,
         @Req() req: Request,
         @UploadedFiles()
         files?: {
+            vehiclePhotoUrl?: Express.Multer.File[];
             drivingLicenseUrl?: Express.Multer.File[];
             vehicleRegistrationUrl?: Express.Multer.File[];
             insuranceUrl?: Express.Multer.File[];

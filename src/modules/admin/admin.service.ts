@@ -594,7 +594,7 @@ export class AdminService {
                         instruction: true,
                         postCode: true,
                     },
-                },             
+                },
                 items: {
                     select: {
                         id: true,
@@ -631,6 +631,7 @@ export class AdminService {
                         status: true,
                         latitude: true,
                         longitude: true,
+                        updatedAt: true,
                         driver: {
                             select: {
                                 id: true,
@@ -639,8 +640,12 @@ export class AdminService {
                                 profileImage: true,
                                 driverProfile: {
                                     select: {
+                                        phoneNumber: true,
                                         registrationNumber: true,
                                         vehicleType: true,
+                                        vehicleColor: true,
+                                        vehiclePhotoUrls: true,
+                                        vehicleModel: true,
                                     },
                                 },
                             },

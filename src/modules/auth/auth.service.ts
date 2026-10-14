@@ -16,6 +16,7 @@ import {
     RegisterUserDto,
     ResendOtpDto,
     ResetPasswordDto,
+    UpdateDriverProfileDto,
     updateUserDto,
     VerifyOtpDto,
     VerifyRegistrationDto,
@@ -729,6 +730,7 @@ export class AuthService {
         user: UserPayload,
         payload: CreateDriverProfileDto,
         files?: {
+            vehiclePhotoUrl?: Express.Multer.File[];
             drivingLicenseUrl?: Express.Multer.File[];
             vehicleRegistrationUrl?: Express.Multer.File[];
             insuranceUrl?: Express.Multer.File[];
@@ -752,6 +754,7 @@ export class AuthService {
             );
         }
 
+        const vehiclePhotoFile = files?.vehiclePhotoUrl?.[0];
         const drivingLicenseFile = files?.drivingLicenseUrl?.[0];
         const vehicleRegistrationFile = files?.vehicleRegistrationUrl?.[0];
         const insuranceFile = files?.insuranceUrl?.[0];
@@ -759,6 +762,7 @@ export class AuthService {
         const nidFile = files?.nidUrl?.[0];
 
         if (
+            !vehiclePhotoFile ||
             !drivingLicenseFile ||
             !vehicleRegistrationFile ||
             !insuranceFile ||
@@ -767,10 +771,11 @@ export class AuthService {
         ) {
             throw new ApiError(
                 HttpStatus.BAD_REQUEST,
-                "NID, driving license, vehicle registration, insurance, and police clearance documents are required for Driver profile",
+                "Vehicle photo, NID, driving license, vehicle registration, insurance, and police clearance documents are required for Driver profile",
             );
         }
 
+        let vehiclePhotoUrl: string;
         let drivingLicenseUrl: string;
         let vehicleRegistrationUrl: string;
         let insuranceUrl: string;
@@ -778,6 +783,8 @@ export class AuthService {
         let nidUrl: string;
 
         try {
+            vehiclePhotoUrl =
+                await this.fileService.uploadToCloudinary(vehiclePhotoFile);
             drivingLicenseUrl =
                 await this.fileService.uploadToCloudinary(drivingLicenseFile);
             vehicleRegistrationUrl = await this.fileService.uploadToCloudinary(
@@ -802,6 +809,7 @@ export class AuthService {
         await this.prisma.driverProfile.create({
             data: {
                 userId: user.id,
+                vehiclePhotoUrl,
                 drivingLicenseUrl,
                 vehicleRegistrationUrl,
                 insuranceUrl,
@@ -845,8 +853,9 @@ export class AuthService {
 
     async updateDriverProfile(
         user: UserPayload,
-        payload: Partial<CreateDriverProfileDto>,
+        payload: UpdateDriverProfileDto,
         files?: {
+            vehiclePhotoUrl?: Express.Multer.File[];
             drivingLicenseUrl?: Express.Multer.File[];
             vehicleRegistrationUrl?: Express.Multer.File[];
             insuranceUrl?: Express.Multer.File[];
@@ -876,6 +885,7 @@ export class AuthService {
             );
         }
 
+        let vehiclePhotoUrl = existingProfile.vehiclePhotoUrl;
         let drivingLicenseUrl = existingProfile.drivingLicenseUrl;
         let vehicleRegistrationUrl = existingProfile.vehicleRegistrationUrl;
         let insuranceUrl = existingProfile.insuranceUrl;
@@ -883,6 +893,11 @@ export class AuthService {
         let nidUrl = existingProfile.nidUrl;
 
         if (files) {
+            if (files.vehiclePhotoUrl && files.vehiclePhotoUrl.length > 0) {
+                vehiclePhotoUrl = await this.fileService.uploadToCloudinary(
+                    files.vehiclePhotoUrl[0],
+                );
+            }
             if (files.drivingLicenseUrl && files.drivingLicenseUrl.length > 0) {
                 drivingLicenseUrl = await this.fileService.uploadToCloudinary(
                     files.drivingLicenseUrl[0],
@@ -922,6 +937,7 @@ export class AuthService {
                 userId: user.id,
             },
             data: {
+                vehiclePhotoUrl,
                 drivingLicenseUrl,
                 vehicleRegistrationUrl,
                 insuranceUrl,

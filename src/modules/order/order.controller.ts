@@ -23,6 +23,7 @@ import {
     DeliveryDto,
     OrderQueryDto,
     ApplyCouponDto,
+    StartNavigationDto,
 } from "./dto/body.dto";
 import { IsPublic } from "@/common/decorators/auth.decorator";
 
@@ -212,6 +213,18 @@ export class OrderController {
             statusCode: HttpStatus.OK,
             message: result.message,
             data: result.data,
+        });
+    }
+
+    @Patch("/update-navigation")
+    @Roles(UserRole.DRIVER)
+    @ApiOperation({ summary: "Update navigation for the current order" })
+    async updateNavigation(@Req() req: Request, @Body() payload: StartNavigationDto) {
+        const user = req.user as UserPayload;
+        const result = await this.orderService.updateNavigation(user, payload);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
         });
     }
 }
