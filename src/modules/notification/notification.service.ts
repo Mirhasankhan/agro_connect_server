@@ -3,6 +3,7 @@ import { TNotificationType } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { UserPayload } from "@/common/guards/auth.guard";
 import QueryBuilder from "@/common/utils/queryBuilder";
+import { NotificationQueryDto } from "../product/dto/body.dto";
 
 export interface CreateNotificationInput {
     receiverId: string;
@@ -21,7 +22,7 @@ export class NotificationService {
         });
     }
 
-    async getNotificationsByReceiverId(user: UserPayload, query) {
+    async getNotificationsByReceiverId(user: UserPayload, query: NotificationQueryDto) {
         const queryBuilder = new QueryBuilder(this.prisma.notification, query);
 
         const response = await queryBuilder

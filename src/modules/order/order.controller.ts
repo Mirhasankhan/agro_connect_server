@@ -150,6 +150,25 @@ export class OrderController {
         });
     }
 
+    @Get("item/details/:id")
+    @Roles(UserRole.PRODUCER)
+    @ApiOperation({ summary: "Get order item details for producer" })
+    async getOrderItemDetailsForProducer(
+        @Req() req: Request,
+        @Param("id") orderItemId: string,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.orderService.getOrderItemDetailsForProducer(
+            user,
+            orderItemId,
+        );
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
     @Put("delivery/update-status")
     @Roles(UserRole.DRIVER)
     @ApiOperation({ summary: "Mark delivery as picked up or canceled" })
@@ -219,7 +238,10 @@ export class OrderController {
     @Patch("/update-navigation")
     @Roles(UserRole.DRIVER)
     @ApiOperation({ summary: "Update navigation for the current order" })
-    async updateNavigation(@Req() req: Request, @Body() payload: StartNavigationDto) {
+    async updateNavigation(
+        @Req() req: Request,
+        @Body() payload: StartNavigationDto,
+    ) {
         const user = req.user as UserPayload;
         const result = await this.orderService.updateNavigation(user, payload);
         return ResponseService.formatResponse({
