@@ -119,7 +119,7 @@ export class RefreshTokenDto {
 }
 
 export class CreateProducerProfileDto {
-    @IsString()
+    @IsPhoneNumber()
     phoneNumber: string;
 
     @IsEnum(ProducerType)

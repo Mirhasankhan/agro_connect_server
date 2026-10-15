@@ -70,6 +70,7 @@ export class AuthController {
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,
+            data: result.data,
         });
     }
 
@@ -164,9 +165,9 @@ export class AuthController {
         });
     }
 
-    @Throttle({
-        short: { limit: 2, ttl: 60000, blockDuration: 60000 },
-    })
+    // @Throttle({
+    //     short: { limit: 2, ttl: 60000, blockDuration: 60000 },
+    // })
     @Post("create-producer-profile")
     @Roles(UserRole.PRODUCER)
     @UseInterceptors(
