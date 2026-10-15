@@ -8,12 +8,14 @@ import {
     SendSupportDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
+import { NotificationService } from "../notification/notification.service";
 
 @Injectable()
 export class FeedbackService {
     constructor(
         private prisma: PrismaService,
         private fileService: FileService,
+        private notificationService: NotificationService,
     ) {}
 
     async submitReview(user: UserPayload, payload: CreateReviewDto) {
@@ -27,6 +29,11 @@ export class FeedbackService {
                 select: {
                     id: true,
                     productId: true,
+                    product :{
+                        select :{
+                            producerId:true
+                        }
+                    }
                 },
             });
 
@@ -67,6 +74,17 @@ export class FeedbackService {
                 },
             });
         });
+
+        // background.add(async () => {
+            
+        //     await this.notificationService.createNotification({
+        //         receiverId: orderItem.product.producerId,
+        //         title: "You have a new review!",
+        //         content:
+        //             "A new review has been submitted for your product. Please review and respond to the review.",
+        //         notificationType: "Review",
+        //     });
+        // });
 
         return {
             message: "Review submitted successfully",

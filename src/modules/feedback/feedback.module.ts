@@ -3,6 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { Module } from "@nestjs/common";
 import { FeedbackService } from "./feedback.service";
 import { FeedbackController } from "./feedback.controller";
+import { NotificationModule } from "../notification/notification.module";
 
 @Module({
     imports: [
@@ -11,6 +12,7 @@ import { FeedbackController } from "./feedback.controller";
             maxRedirects: 5,
         }),
         JwtModule.register({ global: true }),
+        NotificationModule,
     ],
     providers: [FeedbackService],
     controllers: [FeedbackController],
