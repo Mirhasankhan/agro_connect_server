@@ -158,7 +158,7 @@ export class AuthService {
         });
 
         return {
-            message: "Verified successfully! You can login now",
+            message: `Verified successfully! ${createdUser.role === "PRODUCER" ? "Please complete your profile to start selling." : createdUser.role === "DRIVER" ? "Please complete your profile to start delivering." : "Please complete your profile to start buying."}`,
             data: {
                 id: createdUser.id,
                 role: createdUser.role,
@@ -997,7 +997,7 @@ export class AuthService {
         user: UserPayload,
         payload: updateUserDto,
         file?: Express.Multer.File,
-    ) {
+    ) {    
         const userData = await this.prisma.user.findUniqueOrThrow({
             where: {
                 id: user.id,

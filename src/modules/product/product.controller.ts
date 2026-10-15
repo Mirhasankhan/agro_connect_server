@@ -189,4 +189,24 @@ export class ProductController {
             data: result.data,
         });
     }
+
+    @Get("producer-product-details/:id")
+    @Roles(UserRole.PRODUCER)
+    @ApiOperation({ summary: "Get product details for producer" })
+    async getProductDetailsForProducer(
+        @Req() req: Request,
+        @Param("id") id: string,
+    ) {
+        const user = req.user as UserPayload;
+        const result = await this.productService.getProductDetailsForProducer(
+            id,
+            user,
+        );
+
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
 }

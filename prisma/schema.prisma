@@ -37,6 +37,7 @@ model User {
   buyerProfile      BuyerProfile?
   notifications     Notification[]
   driverReviews     DriverReview[]
+  withdraws         Withdraw[]
 
   @@map("users")
 }
@@ -437,6 +438,25 @@ model Support {
   updatedAt DateTime @updatedAt
 
   @@map("support")
+}
+
+model Withdraw {
+  id     String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId String            @db.ObjectId
+  amount Float
+  status TransactionStatus @default(Pending)
+  user   User              @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("withdraws")
+}
+
+enum TransactionStatus {
+  Pending
+  Approved
+  Rejected
 }
 
 model Term {

@@ -229,7 +229,7 @@ const authRequests = [
                 body: {
                     success: true,
                     statusCode: 200,
-                    message: "Verified successfully! You can login now",
+                    message: "Verified successfully!",
                 },
             },
         ],

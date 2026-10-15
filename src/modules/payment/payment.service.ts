@@ -1,10 +1,14 @@
 import { UserPayload } from "@/common/guards/auth.guard";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
-import { Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable } from "@nestjs/common";
 import {
     EarningSummaryQueryDto,
     EarningSummaryType,
+    WithdrawQueryDto,
+    WithdrawRequestDto,
 } from "./dto/body.dto";
+import { ApiError } from "@/common/errors/api_error";
+import QueryBuilder from "@/common/utils/queryBuilder";
 
 @Injectable()
 export class PaymentService {
@@ -58,30 +62,18 @@ export class PaymentService {
                     : null;
             })
             .filter(
-                (
-                    earning,
-                ): earning is { amount: number; date: Date } =>
+                (earning): earning is { amount: number; date: Date } =>
                     earning !== null,
             );
 
         if (type === EarningSummaryType.WEEKLY) {
-            const dayNames = [
-                "sat",
-                "sun",
-                "mon",
-                "tue",
-                "wed",
-                "thu",
-                "fri",
-            ];
+            const dayNames = ["sat", "sun", "mon", "tue", "wed", "thu", "fri"];
             const currentDate = new Date();
             const currentDay = currentDate.getDay();
             const daysSinceSaturday = (currentDay + 1) % 7;
             const weekStart = new Date(currentDate);
             weekStart.setHours(0, 0, 0, 0);
-            weekStart.setDate(
-                currentDate.getDate() - daysSinceSaturday,
-            );
+            weekStart.setDate(currentDate.getDate() - daysSinceSaturday);
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekStart.getDate() + 7);
 
@@ -142,10 +134,7 @@ export class PaymentService {
                                     date.getMonth() === monthIndex
                                 );
                             })
-                            .reduce(
-                                (total, { amount }) => total + amount,
-                                0,
-                            ),
+                            .reduce((total, { amount }) => total + amount, 0),
                     ),
                 ]),
             );
@@ -160,10 +149,7 @@ export class PaymentService {
 
         for (const { amount, date } of earnings) {
             const year = date.getFullYear();
-            yearlySummary.set(
-                year,
-                (yearlySummary.get(year) ?? 0) + amount,
-            );
+            yearlySummary.set(year, (yearlySummary.get(year) ?? 0) + amount);
         }
 
         const summary = Object.fromEntries(
@@ -179,6 +165,96 @@ export class PaymentService {
             message: "Producer yearly earnings fetched successfully",
             data: [summary],
         };
+    }
+
+    async sendWithdrawRequest(user: UserPayload, payload: WithdrawRequestDto) {
+        const existingPendingRequest = await this.prisma.withdraw.findFirst({
+            where: {
+                userId: user.id,
+                status: "Pending",
+            },
+            select: {
+                status: true,
+            },
+        });
+
+        if (existingPendingRequest) {
+            throw new ApiError(
+                HttpStatus.BAD_REQUEST,
+                "You already have a pending withdraw request",
+            );
+        }
+
+        let currentBalance = null;
+
+        if (user.role === "PRODUCER") {
+            const producerProfile =
+                await this.prisma.producerProfile.findUnique({
+                    where: {
+                        userId: user.id,
+                    },
+                    select: {
+                        currentEarnings: true,
+                    },
+                });
+            currentBalance = producerProfile?.currentEarnings ?? null;
+        }
+        if (user.role === "DRIVER") {
+            const driverProfile = await this.prisma.driverProfile.findUnique({
+                where: {
+                    userId: user.id,
+                },
+                select: {
+                    currentEarnings: true,
+                },
+            });
+            currentBalance = driverProfile?.currentEarnings ?? null;
+        }
+
+        if (currentBalance < payload.amount) {
+            throw new ApiError(HttpStatus.BAD_REQUEST, "Insufficient balance");
+        }
+
+        await this.prisma.withdraw.create({
+            data: {
+                userId: user.id,
+                amount: payload.amount,
+            },
+        });
+
+        return {
+            message: "Withdraw request sent successfully",
+        };
+    }
+
+    async getUserWithdrawRequests(user: UserPayload, query?: WithdrawQueryDto) {
+        const queryBuilder = new QueryBuilder(this.prisma.withdraw, query);
+
+        const response = await queryBuilder
+            .filter({
+                exacts: ["status"],
+            })
+            .rawFilter({
+                userId: user.id,
+            })
+            .sortBy({
+                createdAt: "desc",
+            })
+            .paginate()
+            .execute();
+
+        const [withdrawRequests, pagination] = await Promise.all([
+            response,
+            queryBuilder.countTotal(),
+        ]);
+
+        return { 
+            message: "User withdraw requests fetched successfully",
+            data: {
+                withdrawRequests,
+                meta: pagination,
+            },
+         };
     }
 
     private roundEarnings(amount: number) {

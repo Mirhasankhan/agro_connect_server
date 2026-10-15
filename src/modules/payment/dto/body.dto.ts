@@ -1,4 +1,11 @@
-import { IsEnum, IsIn, IsOptional, IsString } from "class-validator";
+import { TransactionStatus } from "@prisma/client";
+import {
+    IsEnum,
+    IsNumber,
+    IsOptional,
+    IsString,
+    Min,
+} from "class-validator";
 
 export enum EarningSummaryType {
     YEARLY = "yearly",
@@ -11,12 +18,22 @@ export class EarningSummaryQueryDto {
     type: EarningSummaryType;
 }
 
-export class PaymentQueryDto {
+export class WithdrawQueryDto {
     @IsOptional()
-    @IsIn(["true", "false"])
-    isTransferred?: string;
+    @IsEnum(TransactionStatus)
+    status?: TransactionStatus;
 
     @IsOptional()
     @IsString()
-    search?: string;
+    page?: string;
+
+    @IsOptional()
+    @IsString()
+    limit?: string;
+}
+
+export class WithdrawRequestDto {
+    @IsNumber()
+    @Min(1)
+    amount: number;
 }

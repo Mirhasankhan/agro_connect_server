@@ -525,7 +525,7 @@ export class ProductService {
                 producerProfile: {
                     verificationStatus: "Accepted",
                 },
-            },          
+            },
             select: {
                 id: true,
                 fullName: true,
@@ -537,9 +537,9 @@ export class ProductService {
                 },
                 producerProfile: {
                     select: {
-                        farmName: true,                     
+                        farmName: true,
                         farmLocation: true,
-                        farmPhotoUrl: true,                        
+                        farmPhotoUrl: true,
                     },
                 },
             },
@@ -573,8 +573,7 @@ export class ProductService {
                               producerProducts.reduce(
                                   (total, product) =>
                                       total +
-                                      product.avgRating *
-                                          product.totalReviews,
+                                      product.avgRating * product.totalReviews,
                                   0,
                               ) / totalReviews
                           ).toFixed(1),
@@ -598,6 +597,82 @@ export class ProductService {
             message: "Our best producers fetched successfully",
             data: {
                 producers: rankedProducers,
+            },
+        };
+    }
+
+    async getProductDetailsForProducer(productId: string, user?: UserPayload) {
+        const product = await this.prisma.product.findUniqueOrThrow({
+            where: {
+                id: productId,
+                producerId: user?.id,
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                sellingUnit: true,
+                pricePerUnit: true,
+                availableQuantity: true,
+                imageUrls: true,
+                avgRating: true,
+                createdAt: true,
+                isActive: true,
+                _count: {
+                    select: {
+                        orderItems: true,
+                    },
+                },
+                orderItems: {
+                    select: {
+                        subtotal: true,
+                        productName: true,
+                        quantity: true,
+                        sellingUnit: true,
+                        status: true,
+                        unitPrice: true,
+                        review: {
+                            select: {
+                                rating: true,
+                                comment: true,
+                                createdAt: true,
+                                buyer: {
+                                    select: {
+                                        fullName: true,
+                                        profileImage: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                totalReviews: true,
+                category: {
+                    select: {
+                        name: true,
+                        
+                    },
+                },
+            },
+        });
+
+        const revenue = await this.prisma.orderItem.aggregate({
+            where: {
+                productId: product.id,
+                order: {
+                    status: "Delivered",
+                },
+            },
+            _sum: {
+                subtotal: true,
+            },
+        });
+
+        return {
+            message: "Product fetched successfully",
+            data: {
+                product,
+                revenue: revenue._sum.subtotal ?? 0,
             },
         };
     }
