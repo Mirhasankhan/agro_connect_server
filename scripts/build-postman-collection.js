@@ -1,13 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 
-// Helper to generate UUIDs
-function uuid() {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-        const r = (Math.random() * 16) | 0;
-        const v = c === "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
+const crypto = require("crypto");
+
+// Helper to generate deterministic UUIDs
+function uuid(seed) {
+    if (!seed) {
+        seed = Math.random().toString();
+    }
+    const hash = crypto.createHash("md5").update(String(seed)).digest("hex");
+    return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }
 
 // Helper to construct request url object
@@ -87,9 +89,12 @@ function createResponseExample({
     headers = [{ key: "Content-Type", value: "application/json" }],
 }) {
     const bodyStr = typeof bodyObj === "string" ? bodyObj : JSON.stringify(bodyObj, null, 2);
+    const reqMethod = originalRequest?.method || "GET";
+    const reqUrl = originalRequest?.url?.raw || "";
+    const seed = `${reqMethod}_${reqUrl}_${name}_${statusCode}`;
 
     return {
-        id: uuid(),
+        id: uuid(seed),
         name,
         originalRequest: {
             method: originalRequest.method,
@@ -194,15 +199,7 @@ const authRequests = [
                 "### Verify Registration\nVerifies the 6-digit OTP sent to the user's email during registration, creating the verified user account.\n\n- **Authentication:** Public\n\n### Request Body Fields:\n- `email`: Registered email address (Required)\n- `otp`: 6-digit verification OTP (Required)\n- `fcmToken`: Firebase Cloud Messaging device push token // optional",
             body: {
                 mode: "raw",
-                raw: JSON.stringify(
-                    {
-                        email: "alice.buyer@example.com",
-                        otp: "123456",
-                        fcmToken: "dKj48_fake_fcm_token_device_string_xyz",
-                    },
-                    null,
-                    2,
-                ),
+                raw: "{\n  \"email\": \"alice.buyer@example.com\",\n  \"otp\": \"123456\",\n  \"fcmToken\": \"dKj48_fake_fcm_token_device_string_xyz\" // optional\n}",
                 options: { raw: { language: "json" } },
             },
             event: [
@@ -225,11 +222,49 @@ const authRequests = [
         }),
         [
             {
-                name: "200 OK - Verified Successfully",
+                name: "200 OK - Verified Successfully (Buyer)",
                 body: {
                     success: true,
                     statusCode: 200,
-                    message: "Verified successfully!",
+                    message: "Verified successfully! Please complete your profile to start buying.",
+                    data: {
+                        id: "672f10b7e21a224a5b112233",
+                        role: "BUYER",
+                        accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MmYxMGI3ZTIxYTIyNGE1YjExMjIzMyIsImVtYWlsIjoiYWxpY2UuYnV5ZXJAZXhhbXBsZS5jb20iLCJyb2xlIjoiQlVZRVIifQ.sample_jwt_token",
+                    },
+                },
+            },
+            {
+                name: "200 OK - Verified Successfully (Producer)",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Verified successfully! Please complete your profile to start selling.",
+                    data: {
+                        id: "672f10b7e21a224a5b112234",
+                        role: "PRODUCER",
+                        accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MmYxMGI3ZTIxYTIyNGE1YjExMjIzNCIsImVtYWlsIjoicHJvZHVjZXJAZXhhbXBsZS5jb20iLCJyb2xlIjoiUFJPRFVRRVIifQ.sample_jwt_token",
+                    },
+                },
+            },
+            {
+                name: "400 Bad Request - OTP Expired",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "OTP expired",
+                },
+            },
+            {
+                name: "403 Forbidden - Incorrect OTP",
+                statusCode: 403,
+                statusText: "Forbidden",
+                body: {
+                    success: false,
+                    statusCode: 403,
+                    message: "Incorrect OTP",
                 },
             },
         ],
@@ -244,15 +279,7 @@ const authRequests = [
                 "### Login User\nAuthenticates user credentials and returns a signed JWT access token. Automatically stores `accessToken` into collection variables.\n\n- **Authentication:** Public\n\n### Request Body Fields:\n- `email`: Registered email (Required)\n- `password`: Account password (Required)\n- `fcmToken`: Firebase device token for push notifications // optional",
             body: {
                 mode: "raw",
-                raw: JSON.stringify(
-                    {
-                        email: "alice.buyer@example.com",
-                        password: "Password123!",
-                        fcmToken: "dKj48_fake_fcm_token_device_string_xyz",
-                    },
-                    null,
-                    2,
-                ),
+                raw: "{\n  \"email\": \"alice.buyer@example.com\",\n  \"password\": \"Password123!\",\n  \"fcmToken\": \"dKj48_fake_fcm_token_device_string_xyz\" // optional\n}",
                 options: { raw: { language: "json" } },
             },
             event: [
@@ -300,6 +327,16 @@ const authRequests = [
                         role: "PRODUCER",
                         isSetuCompleted: false,
                     },
+                },
+            },
+            {
+                name: "401 Unauthorized - Invalid Credentials",
+                statusCode: 401,
+                statusText: "Unauthorized",
+                body: {
+                    success: false,
+                    statusCode: 401,
+                    message: "Invalid Credentials",
                 },
             },
         ],
@@ -743,15 +780,15 @@ const authRequests = [
             method: "POST",
             pathSegments: ["auth", "create-driver-profile"],
             description:
-                "### Create Driver Profile (Multipart)\nUploads required vehicle, identity, and licensing documents and creates driver profile.\n\n- **Authentication:** Bearer Token (Role: `DRIVER`)\n- **Body Mode:** `form-data`\n\n### File Fields (All Required):\n- `nidUrl`: National Identity card document (Required)\n- `drivingLicenseUrl`: Valid driver's license document (Required)\n- `vehicleRegistrationUrl`: Official vehicle registration document (Required)\n- `insuranceUrl`: Active insurance policy certificate (Required)\n- `policeClearanceUrl`: Police record clearance document (Required)\n\n### Text Fields:\n- `phoneNumber`: Phone number (Required)\n- `city`: Operating city (Required)\n- `region`: Operating region (Required)\n- `address`: Home/depot address (Required)\n- `vehicleType`: Enum: `BIKE`, `MOTORCYCLE`, `THREE_WHEELER`, `VAN`, `TRUCK`, `PICKUP` (Required)\n- `registrationNumber`: Official license plate number (Required)",
+                "### Create Driver Profile (Multipart)\nUploads required vehicle photo, identity, and licensing documents and creates driver profile.\n\n- **Authentication:** Bearer Token (Role: `DRIVER`)\n- **Body Mode:** `form-data`\n\n### File Fields (All Required):\n- `vehiclePhotoUrl`: Official photo of the driver's vehicle (Required)\n- `nidUrl`: National Identity card document (Required)\n- `drivingLicenseUrl`: Valid driver's license document (Required)\n- `vehicleRegistrationUrl`: Official vehicle registration document (Required)\n- `insuranceUrl`: Active insurance policy certificate (Required)\n- `policeClearanceUrl`: Police record clearance document (Required)\n\n### Text Fields:\n- `phoneNumber`: Valid phone number (Required)\n- `city`: Operating city (Required)\n- `region`: Operating region (Required)\n- `address`: Home or depot address (Required)\n- `vehicleType`: Enum: `BIKE`, `MOTORCYCLE`, `THREE_WHEELER`, `VAN`, `TRUCK`, `PICKUP` (Required)\n- `registrationNumber`: Official license plate number (Required)\n- `model`: Vehicle make and model (Required)\n- `year`: Manufacturing year between 1900 and 2026 (Required)\n- `vehicleColor`: Exterior color of vehicle (Required)",
             body: {
                 mode: "formdata",
                 formdata: [
                     {
-                        key: "nidUrl",
+                        key: "vehiclePhotoUrl",
                         type: "file",
                         src: [],
-                        description: "National ID Card Document (Required)",
+                        description: "Vehicle Photo (Required)",
                     },
                     {
                         key: "drivingLicenseUrl",
@@ -776,6 +813,12 @@ const authRequests = [
                         type: "file",
                         src: [],
                         description: "Police Clearance Certificate (Required)",
+                    },
+                    {
+                        key: "nidUrl",
+                        type: "file",
+                        src: [],
+                        description: "National ID Card Document (Required)",
                     },
                     {
                         key: "phoneNumber",
@@ -814,6 +857,24 @@ const authRequests = [
                         type: "text",
                         description: "Vehicle license plate registration (Required)",
                     },
+                    {
+                        key: "model",
+                        value: "Toyota HiAce",
+                        type: "text",
+                        description: "Vehicle Model and Make (Required)",
+                    },
+                    {
+                        key: "year",
+                        value: "2022",
+                        type: "text",
+                        description: "Manufacturing Year 1900-2026 (Required)",
+                    },
+                    {
+                        key: "vehicleColor",
+                        value: "White",
+                        type: "text",
+                        description: "Vehicle exterior color (Required)",
+                    },
                 ],
             },
         }),
@@ -826,6 +887,26 @@ const authRequests = [
                     message: "Driver profile created successfully",
                 },
             },
+            {
+                name: "400 Bad Request - Missing Required Documents",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "Vehicle photo, NID, driving license, vehicle registration, insurance, and police clearance documents are required for Driver profile",
+                },
+            },
+            {
+                name: "409 Conflict - Profile Already Exists",
+                statusCode: 409,
+                statusText: "Conflict",
+                body: {
+                    success: false,
+                    statusCode: 409,
+                    message: "Driver profile already exists!",
+                },
+            },
         ],
     ),
     withExamples(
@@ -834,10 +915,16 @@ const authRequests = [
             method: "PUT",
             pathSegments: ["auth", "update-driver-profile"],
             description:
-                "### Update Driver Profile (Multipart)\nUpdates vehicle details and documents for the authenticated driver.\n\n- **Authentication:** Bearer Token (Role: `DRIVER`)\n- **Body Mode:** `form-data`\n\n### Fields (All Optional):\n- `drivingLicenseUrl`: Replacement license file // optional\n- `vehicleRegistrationUrl`: Replacement registration file // optional\n- `insuranceUrl`: Replacement insurance file // optional\n- `policeClearanceUrl`: Replacement police clearance file // optional\n- `nidUrl`: Replacement NID file // optional\n- `vehicleType`: Updated vehicle type enum // optional\n- `registrationNumber`: Updated license plate // optional\n- `phoneNumber`: Updated phone number // optional\n- `city`: Updated city // optional\n- `region`: Updated region // optional\n- `address`: Updated address // optional",
+                "### Update Driver Profile (Multipart)\nUpdates vehicle details and documents for the authenticated driver.\n\n- **Authentication:** Bearer Token (Role: `DRIVER`)\n- **Body Mode:** `form-data`\n\n### Fields (All Optional):\n- `vehiclePhotoUrl`: Replacement vehicle photo file // optional\n- `drivingLicenseUrl`: Replacement license file // optional\n- `vehicleRegistrationUrl`: Replacement registration file // optional\n- `insuranceUrl`: Replacement insurance file // optional\n- `policeClearanceUrl`: Replacement police clearance file // optional\n- `nidUrl`: Replacement NID file // optional\n- `vehicleType`: Updated vehicle type enum // optional\n- `registrationNumber`: Updated license plate // optional\n- `model`: Updated vehicle model // optional\n- `year`: Updated manufacturing year // optional\n- `vehicleColor`: Updated vehicle color // optional\n- `phoneNumber`: Updated phone number // optional\n- `city`: Updated city // optional\n- `region`: Updated region // optional\n- `address`: Updated address // optional",
             body: {
                 mode: "formdata",
                 formdata: [
+                    {
+                        key: "vehiclePhotoUrl",
+                        type: "file",
+                        src: [],
+                        description: "vehiclePhotoUrl // optional",
+                    },
                     {
                         key: "drivingLicenseUrl",
                         type: "file",
@@ -881,6 +968,24 @@ const authRequests = [
                         description: "registrationNumber // optional",
                     },
                     {
+                        key: "model",
+                        value: "Mercedes Sprinter",
+                        type: "text",
+                        description: "model // optional",
+                    },
+                    {
+                        key: "year",
+                        value: "2023",
+                        type: "text",
+                        description: "year // optional",
+                    },
+                    {
+                        key: "vehicleColor",
+                        value: "Blue",
+                        type: "text",
+                        description: "vehicleColor // optional",
+                    },
+                    {
                         key: "phoneNumber",
                         value: "+2250703040599",
                         type: "text",
@@ -914,6 +1019,16 @@ const authRequests = [
                     success: true,
                     statusCode: 200,
                     message: "Driver profile updated successfully",
+                },
+            },
+            {
+                name: "404 Not Found - Driver Profile Not Found",
+                statusCode: 404,
+                statusText: "Not Found",
+                body: {
+                    success: false,
+                    statusCode: 404,
+                    message: "Driver profile not found",
                 },
             },
         ],
@@ -1103,6 +1218,190 @@ const authRequests = [
             },
         ],
     ),
+    withExamples(
+        createRequest({
+            name: "Get Driver Home Data",
+            method: "GET",
+            pathSegments: ["auth", "driver-home-data"],
+            description:
+                "### Driver Home Dashboard Data\nFetches real-time driver profile data including total earnings, current balance, ratings, availability status, and recent deliveries.\n\n- **Authentication:** Bearer Token (Role: `DRIVER`)",
+        }),
+        [
+            {
+                name: "200 OK - Driver Home Data Found",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Driver home data fetched successfully",
+                    data: {
+                        user: {
+                            id: "672f10b7e21a224a5b112235",
+                            fullName: "Koffi Mensah",
+                            profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/driver.jpg",
+                            deliveries: [
+                                {
+                                    id: "672f10b7e21a224a5b112295",
+                                    orderId: "672f10b7e21a224a5b112280",
+                                    status: "InTransit",
+                                    createdAt: "2026-10-15T08:00:00.000Z",
+                                    order: {
+                                        totalAmount: 15000,
+                                        shippingAddress: {
+                                            addressLine: "Marcory Zone 4, Rue du 7 Decembre",
+                                            city: "Abidjan",
+                                        },
+                                    },
+                                },
+                            ],
+                            _count: {
+                                deliveries: 48,
+                                notifications: 3,
+                            },
+                        },
+                        allTimeEarnings: 124500,
+                        avgRating: 4.8,
+                        totalReviews: 39,
+                        currentEarnings: 34500,
+                        isAvailable: true,
+                    },
+                },
+            },
+            {
+                name: "200 OK - New Driver (Zero Deliveries)",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Driver home data fetched successfully",
+                    data: {
+                        user: {
+                            id: "672f10b7e21a224a5b112239",
+                            fullName: "Jean Kouassi",
+                            profileImage: null,
+                            deliveries: [],
+                            _count: {
+                                deliveries: 0,
+                                notifications: 0,
+                            },
+                        },
+                        allTimeEarnings: 0,
+                        avgRating: 0,
+                        totalReviews: 0,
+                        currentEarnings: 0,
+                        isAvailable: false,
+                    },
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Get Producer Home Data",
+            method: "GET",
+            pathSegments: ["auth", "producer-home-data"],
+            description:
+                "### Producer Home Dashboard Data\nFetches active statistics for producer dashboard including verification status, all-time earnings, top catalog products, and counts of active orders and unread alerts.\n\n- **Authentication:** Bearer Token (Role: `PRODUCER`)",
+        }),
+        [
+            {
+                name: "200 OK - Producer Home Data Found",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Producer home data fetched successfully",
+                    data: {
+                        id: "672f10b7e21a224a5b112234",
+                        fullName: "Amadou Traore",
+                        profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/amadou.jpg",
+                        producerProfile: {
+                            verificationStatus: "Accepted",
+                            allTimeEarnings: 385000,
+                        },
+                        products: [
+                            {
+                                id: "672f10b7e21a224a5b112240",
+                                name: "Organic Kent Mangoes",
+                                imageUrls: [
+                                    "https://res.cloudinary.com/demo/image/upload/v12345/mango1.jpg",
+                                ],
+                                sellingUnit: "CRATE",
+                                availableQuantity: 150,
+                                sold: 85,
+                                avgRating: 4.9,
+                                category: {
+                                    name: "Fruits",
+                                },
+                            },
+                        ],
+                        _count: {
+                            notifications: 2,
+                            products: 6,
+                        },
+                    },
+                    activeOrderItems: 4,
+                },
+            },
+            {
+                name: "200 OK - New Producer (Pending Verification)",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Producer home data fetched successfully",
+                    data: {
+                        id: "672f10b7e21a224a5b112238",
+                        fullName: "Fatou Kone",
+                        profileImage: null,
+                        producerProfile: {
+                            verificationStatus: "Pending",
+                            allTimeEarnings: 0,
+                        },
+                        products: [],
+                        _count: {
+                            notifications: 1,
+                            products: 0,
+                        },
+                    },
+                    activeOrderItems: 0,
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Toggle Driver Online Status",
+            method: "PUT",
+            pathSegments: ["auth", "toggle-online-status"],
+            description:
+                "### Toggle Driver Availability Status\nFlips driver between Online (available for dispatch) and Offline. Blocked if driver currently has active deliveries.\n\n- **Authentication:** Bearer Token (Role: `DRIVER`)",
+        }),
+        [
+            {
+                name: "200 OK - Now Online",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Youra are now online",
+                },
+            },
+            {
+                name: "200 OK - Now Offline",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Youra are now offline",
+                },
+            },
+            {
+                name: "400 Bad Request - Active Deliveries In Progress",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "Cannot go online while having active deliveries",
+                },
+            },
+        ],
+    ),
 ];
 
 // 3. ADMIN MODULE
@@ -1222,15 +1521,7 @@ const adminRequests = [
                 "### Review Producer Account Verification\nApproves or rejects a pending producer application. When rejected, a reason must be supplied.\n\n- **Authentication:** Bearer Token (Role: `ADMIN`)\n\n### Request Body Fields:\n- `accountId`: User ID of the producer (Required)\n- `isAccept`: `true` to approve, `false` to reject (Required)\n- `rejectReason`: Rejection explanation message // optional (Required if isAccept is false)",
             body: {
                 mode: "raw",
-                raw: JSON.stringify(
-                    {
-                        accountId: "672f10b7e21a224a5b112234",
-                        isAccept: true,
-                        rejectReason: "Missing clear land title document",
-                    },
-                    null,
-                    2,
-                ),
+                raw: "{\n  \"accountId\": \"672f10b7e21a224a5b112234\",\n  \"isAccept\": true,\n  \"rejectReason\": \"Missing clear land title document\" // optional\n}",
                 options: { raw: { language: "json" } },
             },
         }),
@@ -1445,15 +1736,7 @@ const adminRequests = [
                 "### Review Driver Account Verification\nApproves or rejects a driver's pending verification status.\n\n- **Authentication:** Bearer Token (Role: `ADMIN`)\n\n### Request Body Fields:\n- `accountId`: User ID of driver (Required)\n- `isAccept`: `true` to approve, `false` to reject (Required)\n- `rejectReason`: Rejection explanation string // optional (Required if isAccept is false)",
             body: {
                 mode: "raw",
-                raw: JSON.stringify(
-                    {
-                        accountId: "672f10b7e21a224a5b112235",
-                        isAccept: true,
-                        rejectReason: "Vehicle registration expired",
-                    },
-                    null,
-                    2,
-                ),
+                raw: "{\n  \"accountId\": \"672f10b7e21a224a5b112235\",\n  \"isAccept\": true,\n  \"rejectReason\": \"Vehicle registration expired\" // optional\n}",
                 options: { raw: { language: "json" } },
             },
         }),
@@ -1693,6 +1976,176 @@ const adminRequests = [
                     success: true,
                     statusCode: 200,
                     message: "Terms updated successfully",
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "All Orders (Admin)",
+            method: "GET",
+            pathSegments: ["admin", "all-orders"],
+            queryParams: [
+                { key: "search", value: "ORD-1728", description: "search // optional" },
+                { key: "status", value: "Delivered", description: "status // optional" },
+                { key: "page", value: "1", description: "page // optional" },
+                { key: "limit", value: "10", description: "limit // optional" },
+            ],
+            description:
+                "### List All Orders (Admin)\nFetches paginated list of paid orders across the platform with customer details, order metrics, item counts, and revenue statistics.\n\n- **Authentication:** Bearer Token (Role: `ADMIN`)\n\n### Query Parameters:\n- `search`: Search orderId, customer fullName, or customer email // optional\n- `status`: Filter by status: `Active`, `Delivered`, `Cancelled` // optional\n- `page`: Page index (default: 1) // optional\n- `limit`: Page size (default: 10) // optional",
+        }),
+        [
+            {
+                name: "200 OK - Orders Found",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "All orders fetched successfully",
+                    data: {
+                        orders: [
+                            {
+                                id: "672f10b7e21a224a5b112280",
+                                orderId: "ORD-1728891234567-8901",
+                                status: "Delivered",
+                                totalAmount: 15000,
+                                createdAt: "2026-10-14T09:00:00.000Z",
+                                _count: {
+                                    items: 2,
+                                },
+                                customer: {
+                                    id: "672f10b7e21a224a5b112233",
+                                    fullName: "Alice Cooper",
+                                    email: "alice.buyer@example.com",
+                                    profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/alice.jpg",
+                                },
+                            },
+                        ],
+                        meta: {
+                            page: 1,
+                            limit: 10,
+                            total: 35,
+                            totalPage: 4,
+                            completed: 28,
+                            cancelled: 2,
+                            totalAmount: 485000,
+                        },
+                    },
+                },
+            },
+            {
+                name: "200 OK - No Orders (Empty)",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "All orders fetched successfully",
+                    data: {
+                        orders: [],
+                        meta: {
+                            page: 1,
+                            limit: 10,
+                            total: 0,
+                            totalPage: 0,
+                            completed: 0,
+                            cancelled: 0,
+                            totalAmount: 0,
+                        },
+                    },
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Get Order by ID (Admin)",
+            method: "GET",
+            pathSegments: ["admin", "order", ":id"],
+            description:
+                "### View Order Details (Admin)\nRetrieves comprehensive information for a specific order including customer profile, shipping address, ordered products with farm origin, and assigned delivery logistics.\n\n- **Authentication:** Bearer Token (Role: `ADMIN`)\n- **URL Param:** `id` - Order MongoId (Required)",
+        }),
+        [
+            {
+                name: "200 OK - Order Details Retrieved",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Order fetched successfully",
+                    data: {
+                        id: "672f10b7e21a224a5b112280",
+                        orderId: "ORD-1728891234567-8901",
+                        status: "Delivered",
+                        createdAt: "2026-10-14T09:00:00.000Z",
+                        totalAmount: 15000,
+                        cancelReason: null,
+                        customer: {
+                            id: "672f10b7e21a224a5b112233",
+                            fullName: "Alice Cooper",
+                            email: "alice.buyer@example.com",
+                            profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/alice.jpg",
+                        },
+                        shippingAddress: {
+                            addressLine: "Cocody Danga, Villa 14",
+                            city: "Abidjan",
+                            instruction: "Leave with security guard",
+                            postCode: "00225",
+                        },
+                        items: [
+                            {
+                                id: "672f10b7e21a224a5b112285",
+                                productName: "Organic Kent Mangoes",
+                                quantity: 5,
+                                unitPrice: 1500,
+                                subtotal: 7500,
+                                sellingUnit: "CRATE",
+                                product: {
+                                    imageUrls: ["https://res.cloudinary.com/demo/image/upload/v12345/mango1.jpg"],
+                                    producer: {
+                                        fullName: "Amadou Traore",
+                                        profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/amadou.jpg",
+                                        producerProfile: {
+                                            farmName: "Traore Organic Farm",
+                                            address: "Bouake Sector 3",
+                                            city: "Bouake",
+                                            farmSize: 25,
+                                            producerType: "Private",
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                        deliveries: [
+                            {
+                                id: "672f10b7e21a224a5b112295",
+                                status: "Delivered",
+                                latitude: 5.3484,
+                                longitude: -4.0197,
+                                updatedAt: "2026-10-14T11:45:00.000Z",
+                                driver: {
+                                    id: "672f10b7e21a224a5b112235",
+                                    fullName: "Koffi Mensah",
+                                    email: "koffi.driver@example.com",
+                                    profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/driver.jpg",
+                                    driverProfile: {
+                                        phoneNumber: "+2250703040506",
+                                        registrationNumber: "1234-AB-01",
+                                        vehicleType: "VAN",
+                                        vehicleColor: "White",
+                                        vehiclePhotoUrl: "https://res.cloudinary.com/demo/image/upload/v12345/van.jpg",
+                                        model: "Toyota HiAce 2022",
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+            {
+                name: "404 Not Found - Order Not Found",
+                statusCode: 404,
+                statusText: "Not Found",
+                body: {
+                    success: false,
+                    statusCode: 404,
+                    message: "Order not found",
                 },
             },
         ],
@@ -2109,22 +2562,7 @@ const productRequests = [
                 "### Update Product Details\nUpdates editable attributes for a producer's existing product.\n\n- **Authentication:** Bearer Token (Role: `PRODUCER`)\n\n### Request Body Fields:\n- `productId`: MongoId of product (Required)\n- `name`: Updated name // optional\n- `description`: Updated description // optional\n- `categoryId`: Updated category MongoId // optional\n- `sellingUnit`: Updated selling unit enum // optional\n- `pricePerUnit`: Updated pricePerUnit integer // optional\n- `availableQuantity`: Updated available quantity integer // optional\n- `isActive`: Updated active visibility flag // optional\n- `isFeatured`: Updated featured status flag // optional",
             body: {
                 mode: "raw",
-                raw: JSON.stringify(
-                    {
-                        productId: "672f10b7e21a224a5b112250",
-                        name: "Organic Kent Mangoes - Premium Batch",
-                        description:
-                            "Fresh harvest premium Kent mangoes with organic certification.",
-                        categoryId: "672f10b7e21a224a5b112240",
-                        sellingUnit: "CRATE",
-                        pricePerUnit: 1600,
-                        availableQuantity: 300,
-                        isActive: true,
-                        isFeatured: true,
-                    },
-                    null,
-                    2,
-                ),
+                raw: "{\n  \"productId\": \"672f10b7e21a224a5b112250\",\n  \"name\": \"Organic Kent Mangoes - Premium Batch\", // optional\n  \"description\": \"Fresh harvest premium Kent mangoes with organic certification.\", // optional\n  \"categoryId\": \"672f10b7e21a224a5b112240\", // optional\n  \"sellingUnit\": \"CRATE\", // optional\n  \"pricePerUnit\": 1600, // optional\n  \"availableQuantity\": 300, // optional\n  \"isActive\": true, // optional\n  \"isFeatured\": true // optional\n}",
                 options: { raw: { language: "json" } },
             },
         }),
@@ -2283,6 +2721,78 @@ const productRequests = [
                             },
                         ],
                     },
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Get Product Details for Producer",
+            method: "GET",
+            pathSegments: ["product", "producer-product-details", ":id"],
+            description:
+                "### View Product Details for Producer\nRetrieves full product metrics including customer ratings, reviews, ordered item history, and total aggregate revenue earned by this product.\n\n- **Authentication:** Bearer Token (Role: `PRODUCER`)\n- **URL Param:** `id` - Product MongoId (Required)",
+        }),
+        [
+            {
+                name: "200 OK - Product Details & Revenue Retrieved",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Product fetched successfully",
+                    data: {
+                        product: {
+                            id: "672f10b7e21a224a5b112240",
+                            name: "Organic Kent Mangoes",
+                            description: "Premium sweet juicy mangoes harvest from northern orchards.",
+                            sellingUnit: "CRATE",
+                            pricePerUnit: 1500,
+                            availableQuantity: 150,
+                            imageUrls: [
+                                "https://res.cloudinary.com/demo/image/upload/v12345/mango1.jpg",
+                            ],
+                            avgRating: 4.9,
+                            createdAt: "2026-10-05T08:00:00.000Z",
+                            isActive: true,
+                            _count: {
+                                orderItems: 18,
+                            },
+                            orderItems: [
+                                {
+                                    subtotal: 7500,
+                                    productName: "Organic Kent Mangoes",
+                                    quantity: 5,
+                                    sellingUnit: "CRATE",
+                                    status: "Delivered",
+                                    unitPrice: 1500,
+                                    review: {
+                                        rating: 5,
+                                        comment: "Exquisite quality and taste!",
+                                        createdAt: "2026-10-10T14:30:00.000Z",
+                                        buyer: {
+                                            fullName: "Alice Cooper",
+                                            profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/alice.jpg",
+                                        },
+                                    },
+                                },
+                            ],
+                            totalReviews: 12,
+                            category: {
+                                name: "Fruits",
+                            },
+                        },
+                        revenue: 127500,
+                    },
+                },
+            },
+            {
+                name: "404 Not Found - Product Not Found",
+                statusCode: 404,
+                statusText: "Not Found",
+                body: {
+                    success: false,
+                    statusCode: 404,
+                    message: "Product not found",
                 },
             },
         ],
@@ -2503,15 +3013,7 @@ const orderRequests = [
                 "### Create Order & Initialize Payment\nConverts cart items into an active order and generates the checkout session URL.\n\n- **Authentication:** Bearer Token (Role: `BUYER`)\n\n### Request Body Fields:\n- `shippingAddressId`: MongoId of chosen shipping address (Required)\n- `cartIds`: Array of Cart MongoIds to purchase (Required)\n- `couponCode`: Promotional coupon code // optional",
             body: {
                 mode: "raw",
-                raw: JSON.stringify(
-                    {
-                        shippingAddressId: "672f10b7e21a224a5b1122a0",
-                        cartIds: ["672f10b7e21a224a5b112270"],
-                        couponCode: "HARVEST15",
-                    },
-                    null,
-                    2,
-                ),
+                raw: "{\n  \"shippingAddressId\": \"672f10b7e21a224a5b1122a0\",\n  \"cartIds\": [\n    \"672f10b7e21a224a5b112270\"\n  ],\n  \"couponCode\": \"HARVEST15\" // optional\n}",
                 options: { raw: { language: "json" } },
             },
         }),
@@ -2989,6 +3491,149 @@ const orderRequests = [
                     },
                 },
             },
+            {
+                name: "404 Not Found - Coupon Not Found",
+                statusCode: 404,
+                statusText: "Not Found",
+                body: {
+                    success: false,
+                    statusCode: 404,
+                    message: "Coupon not found",
+                },
+            },
+            {
+                name: "410 Gone - Coupon Expired",
+                statusCode: 410,
+                statusText: "Gone",
+                body: {
+                    success: false,
+                    statusCode: 410,
+                    message: "Coupon has expired",
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Get Order Item Details for Producer",
+            method: "GET",
+            pathSegments: ["order", "item", "details", ":id"],
+            description:
+                "### View Order Item Details for Producer\nFetches details of a specific line item sold by the producer, including customer information, delivery destination address, assigned driver details, and current coordinates.\n\n- **Authentication:** Bearer Token (Role: `PRODUCER`)\n- **URL Param:** `id` - OrderItem MongoId (Required)",
+        }),
+        [
+            {
+                name: "200 OK - Order Item Details Retrieved",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Order item details fetched successfully",
+                    data: {
+                        id: "672f10b7e21a224a5b112285",
+                        productName: "Organic Kent Mangoes",
+                        createdAt: "2026-10-14T09:00:00.000Z",
+                        sellingUnit: "CRATE",
+                        quantity: 5,
+                        subtotal: 7500,
+                        unitPrice: 1500,
+                        isReviewed: true,
+                        status: "Delivered",
+                        product: {
+                            imageUrls: [
+                                "https://res.cloudinary.com/demo/image/upload/v12345/mango1.jpg",
+                            ],
+                        },
+                        review: {
+                            id: "672f10b7e21a224a5b112290",
+                            rating: 5,
+                            comment: "Fresh and deliciously sweet mangoes!",
+                            createdAt: "2026-10-14T12:00:00.000Z",
+                        },
+                        order: {
+                            orderId: "ORD-1728891234567-8901",
+                            customer: {
+                                fullName: "Alice Cooper",
+                                profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/alice.jpg",
+                            },
+                            shippingAddress: {
+                                addressLine: "Cocody Danga, Villa 14",
+                                city: "Abidjan",
+                                postCode: "00225",
+                            },
+                            deliveries: [
+                                {
+                                    status: "Delivered",
+                                    createdAt: "2026-10-14T09:15:00.000Z",
+                                    latitude: 5.3484,
+                                    longitude: -4.0197,
+                                    updatedAt: "2026-10-14T11:45:00.000Z",
+                                    driver: {
+                                        fullName: "Koffi Mensah",
+                                        profileImage: "https://res.cloudinary.com/demo/image/upload/v12345/driver.jpg",
+                                        driverProfile: {
+                                            id: "672f10b7e21a224a5b112236",
+                                            vehicleType: "VAN",
+                                            registrationNumber: "1234-AB-01",
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+            {
+                name: "404 Not Found - Order Item Not Found",
+                statusCode: 404,
+                statusText: "Not Found",
+                body: {
+                    success: false,
+                    statusCode: 404,
+                    message: "Order item not found",
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Update Navigation",
+            method: "PATCH",
+            pathSegments: ["order", "update-navigation"],
+            description:
+                "### Update Live GPS Navigation for Delivery\nUpdates real-time GPS coordinates for an assigned order in PickedUp status and shifts the delivery status to `InTransit`.\n\n- **Authentication:** Bearer Token (Role: `DRIVER`)\n\n### Request Body Fields:\n- `deliveryId`: MongoId of active delivery (Required)\n- `latitude`: Float between -90 and 90 (Required)\n- `longitude`: Float between -180 and 180 (Required)",
+            body: {
+                mode: "raw",
+                raw: JSON.stringify(
+                    {
+                        deliveryId: "672f10b7e21a224a5b112295",
+                        latitude: 5.34843,
+                        longitude: -4.01972,
+                    },
+                    null,
+                    2,
+                ),
+                options: { raw: { language: "json" } },
+            },
+        }),
+        [
+            {
+                name: "200 OK - Navigation Updated",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Navigation updated successfully",
+                },
+            },
+            {
+                name: "404 Not Found - Delivery Not Picked Up",
+                statusCode: 404,
+                statusText: "Not Found",
+                body: {
+                    success: false,
+                    statusCode: 404,
+                    message: "Delivery not found or not in PickedUp status",
+                },
+            },
         ],
     ),
 ];
@@ -3086,16 +3731,7 @@ const shippingAddressRequests = [
                 "### Create Shipping Address\nSaves a new destination delivery address for the authenticated buyer.\n\n- **Authentication:** Bearer Token (Role: `BUYER`)\n\n### Request Body Fields:\n- `addressLine`: Street address and building / door number (Required)\n- `city`: City (Required)\n- `postCode`: Postal / delivery district code (Required)\n- `instruction`: Special courier delivery notes / instructions (Required)",
             body: {
                 mode: "raw",
-                raw: JSON.stringify(
-                    {
-                        addressLine: "Plateau, Boulevard Carde, Immeuble Alpha 4E",
-                        city: "Abidjan",
-                        postCode: "BP 123",
-                        instruction: "Call front desk receptionist on arrival",
-                    },
-                    null,
-                    2,
-                ),
+                raw: "{\n  \"addressLine\": \"Plateau, Boulevard Carde, Immeuble Alpha 4E\",\n  \"city\": \"Abidjan\",\n  \"postCode\": \"BP 123\",\n  \"instruction\": \"Call front desk receptionist on arrival\" // optional\n}",
                 options: { raw: { language: "json" } },
             },
         }),
@@ -3250,6 +3886,58 @@ const feedbackRequests = [
             },
         ],
     ),
+    withExamples(
+        createRequest({
+            name: "Submit Review to Driver",
+            method: "POST",
+            pathSegments: ["feedback", "driver-review"],
+            description:
+                "### Submit Review to Driver\nAllows buyer to rate and review the driver after delivery completion. Updates driver average rating and total review count.\n\n- **Authentication:** Bearer Token (Role: `BUYER`)\n\n### Request Body Fields:\n- `orderId`: MongoId of the completed order (Required)\n- `rating`: Rating score integer from 1 to 5 (Required)\n- `comment`: Feedback review text (Required)",
+            body: {
+                mode: "raw",
+                raw: JSON.stringify(
+                    {
+                        orderId: "672f10b7e21a224a5b112280",
+                        rating: 5,
+                        comment: "Driver arrived quickly and handled our delicate produce with care.",
+                    },
+                    null,
+                    2,
+                ),
+                options: { raw: { language: "json" } },
+            },
+        }),
+        [
+            {
+                name: "200 OK - Driver Review Submitted",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Driver review submitted successfully",
+                },
+            },
+            {
+                name: "400 Bad Request - Review Already Submitted",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "Driver review already submitted for this order",
+                },
+            },
+            {
+                name: "400 Bad Request - No Driver Assigned",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "No driver found for this order",
+                },
+            },
+        ],
+    ),
 ];
 
 // 10. NOTIFICATION MODULE
@@ -3259,8 +3947,13 @@ const notificationRequests = [
             name: "Get User Notifications",
             method: "GET",
             pathSegments: ["notification", "user-wise"],
+            queryParams: [
+                { key: "notificationType", value: "Delivery", description: "notificationType // optional" },
+                { key: "page", value: "1", description: "page // optional" },
+                { key: "limit", value: "10", description: "limit // optional" },
+            ],
             description:
-                "### View User Notifications\nRetrieves in-app alerts and notifications for the authenticated user.\n\n- **Authentication:** Bearer Token",
+                "### View User Notifications\nRetrieves paginated in-app alerts and notifications for the authenticated user, optionally filtered by notification type. Automatically marks unread notifications as read.\n\n- **Authentication:** Bearer Token\n\n### Query Parameters:\n- `notificationType`: Filter by type: `Order`, `Delivery`, `System`, `Profile` // optional\n- `page`: Page index (default: 1) // optional\n- `limit`: Items per page (default: 10) // optional",
         }),
         [
             {
@@ -3277,12 +3970,46 @@ const notificationRequests = [
                                 title: "Order Shipped",
                                 content:
                                     "Your order ORD-1728891234567-8901 has been picked up by the driver.",
-                                isRead: false,
+                                isRead: true,
                                 notificationType: "Delivery",
-                                createdAt: "2026-10-08T12:30:00.000Z",
-                                updatedAt: "2026-10-08T12:30:00.000Z",
+                                createdAt: "2026-10-14T09:30:00.000Z",
+                                updatedAt: "2026-10-14T10:00:00.000Z",
                             },
                         ],
+                        meta: {
+                            page: 1,
+                            limit: 10,
+                            total: 1,
+                            totalPage: 1,
+                        },
+                    },
+                },
+            },
+            {
+                name: "200 OK - Filtered by Type",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Notifications fetched successfully",
+                    data: {
+                        notifications: [
+                            {
+                                id: "672f10b7e21a224a5b1122b1",
+                                receiverId: "672f10b7e21a224a5b112233",
+                                title: "New Order Placed",
+                                content: "You have received a new purchase for Organic Kent Mangoes.",
+                                isRead: true,
+                                notificationType: "Order",
+                                createdAt: "2026-10-14T09:00:00.000Z",
+                                updatedAt: "2026-10-14T09:05:00.000Z",
+                            },
+                        ],
+                        meta: {
+                            page: 1,
+                            limit: 10,
+                            total: 1,
+                            totalPage: 1,
+                        },
                     },
                 },
             },
@@ -3294,6 +4021,12 @@ const notificationRequests = [
                     message: "Notifications fetched successfully",
                     data: {
                         notifications: [],
+                        meta: {
+                            page: 1,
+                            limit: 10,
+                            total: 0,
+                            totalPage: 0,
+                        },
                     },
                 },
             },
@@ -3301,41 +4034,196 @@ const notificationRequests = [
     ),
 ];
 
-// 11. CONVERSATIONS / SOCKET MODULE
-const conversationRequests = [
+// 11. PAYMENT MODULE
+const paymentRequests = [
     withExamples(
         createRequest({
-            name: "Get User Conversations",
+            name: "Get Producer Earnings Summary",
             method: "GET",
-            pathSegments: ["conversations"],
+            pathSegments: ["payment", "producer-earnings"],
+            queryParams: [
+                { key: "type", value: "weekly", description: "type (weekly, monthly, or yearly) (Required)" },
+            ],
             description:
-                "### View Chat Conversations\nLists all chat conversation threads with participant details, online status, last message preview, and unread message counter.\n\n- **Authentication:** Bearer Token",
+                "### Producer Earnings Analytics\nCalculates net payout earnings (90% of subtotal) from delivered orders grouped by weekly, monthly, or yearly intervals.\n\n- **Authentication:** Bearer Token (Role: `PRODUCER`)\n\n### Query Parameters:\n- `type`: Grouping interval: `weekly`, `monthly`, or `yearly` (Required)",
         }),
         [
             {
-                name: "200 OK - Conversations List",
-                body: [
-                    {
-                        participant: {
-                            id: "672f10b7e21a224a5b112234",
-                            fullName: "Amadou Traore",
-                            profileImage:
-                                "https://res.cloudinary.com/demo/image/upload/v12345/amadou.jpg",
-                            isOnline: true,
+                name: "200 OK - Weekly Earnings Breakdown",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Producer weekly earnings fetched successfully",
+                    data: [
+                        {
+                            sat: 13500.0,
+                            sun: 8200.5,
+                            mon: 22400.0,
+                            tue: 15600.0,
+                            wed: 19800.0,
+                            thu: 31200.0,
+                            fri: 27500.0,
                         },
-                        lastMessage: {
-                            message:
-                                "We have confirmed your shipment order for 3 crates of mangoes.",
-                            images: [],
-                            createdAt: "2026-10-08T10:15:00.000Z",
-                        },
-                        unreadCount: 1,
-                    },
-                ],
+                    ],
+                },
             },
             {
-                name: "200 OK - No Conversations (Empty)",
-                body: [],
+                name: "200 OK - Monthly Earnings Breakdown",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Producer monthly earnings fetched successfully",
+                    data: [
+                        {
+                            jan: 45000.0,
+                            feb: 52000.0,
+                            mar: 68000.0,
+                            apr: 74500.0,
+                            may: 89000.0,
+                            jun: 95000.0,
+                            jul: 110000.0,
+                            aug: 105000.0,
+                            sep: 124000.0,
+                            oct: 138200.0,
+                            nov: 0.0,
+                            dec: 0.0,
+                        },
+                    ],
+                },
+            },
+            {
+                name: "200 OK - Yearly Earnings Breakdown",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Producer yearly earnings fetched successfully",
+                    data: [
+                        {
+                            "2024": 420000.0,
+                            "2025": 890500.0,
+                            "2026": 900700.0,
+                        },
+                    ],
+                },
+            },
+            {
+                name: "400 Bad Request - Invalid Earning Type",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "type must be one of the following values: yearly, monthly, weekly",
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Send Withdraw Request",
+            method: "POST",
+            pathSegments: ["payment", "withdraw"],
+            description:
+                "### Request Fund Withdrawal\nSubmits a withdrawal request from available earnings balance for verified Producers or Drivers.\n\n- **Authentication:** Bearer Token (Role: `PRODUCER` or `DRIVER`)\n\n### Request Body Fields:\n- `amount`: Withdrawal integer amount >= 1 (Required)",
+            body: {
+                mode: "raw",
+                raw: JSON.stringify(
+                    {
+                        amount: 25000,
+                    },
+                    null,
+                    2,
+                ),
+                options: { raw: { language: "json" } },
+            },
+        }),
+        [
+            {
+                name: "200 OK - Withdraw Request Sent",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "Withdraw request sent successfully",
+                },
+            },
+            {
+                name: "400 Bad Request - Insufficient Balance",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "Insufficient balance",
+                },
+            },
+            {
+                name: "400 Bad Request - Pending Request Exists",
+                statusCode: 400,
+                statusText: "Bad Request",
+                body: {
+                    success: false,
+                    statusCode: 400,
+                    message: "You already have a pending withdraw request",
+                },
+            },
+        ],
+    ),
+    withExamples(
+        createRequest({
+            name: "Get User Withdraw Requests",
+            method: "GET",
+            pathSegments: ["payment", "withdraw-requests"],
+            queryParams: [
+                { key: "status", value: "Pending", description: "status // optional" },
+                { key: "page", value: "1", description: "page // optional" },
+                { key: "limit", value: "10", description: "limit // optional" },
+            ],
+            description:
+                "### View User Withdraw Requests\nRetrieves paginated withdrawal transaction requests submitted by the authenticated producer or driver.\n\n- **Authentication:** Bearer Token (Role: `PRODUCER` or `DRIVER`)\n\n### Query Parameters:\n- `status`: Filter by TransactionStatus: `Pending`, `Success`, `Failed` // optional\n- `page`: Page index (default: 1) // optional\n- `limit`: Items per page (default: 10) // optional",
+        }),
+        [
+            {
+                name: "200 OK - Withdraw Requests Found",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "User withdraw requests fetched successfully",
+                    data: {
+                        withdrawRequests: [
+                            {
+                                id: "672f10b7e21a224a5b1122e1",
+                                userId: "672f10b7e21a224a5b112234",
+                                amount: 25000,
+                                status: "Pending",
+                                createdAt: "2026-10-15T10:00:00.000Z",
+                                updatedAt: "2026-10-15T10:00:00.000Z",
+                            },
+                        ],
+                        meta: {
+                            page: 1,
+                            limit: 10,
+                            total: 1,
+                            totalPage: 1,
+                        },
+                    },
+                },
+            },
+            {
+                name: "200 OK - No Withdraw Requests (Empty)",
+                body: {
+                    success: true,
+                    statusCode: 200,
+                    message: "User withdraw requests fetched successfully",
+                    data: {
+                        withdrawRequests: [],
+                        meta: {
+                            page: 1,
+                            limit: 10,
+                            total: 0,
+                            totalPage: 0,
+                        },
+                    },
+                },
             },
         ],
     ),
@@ -3434,9 +4322,9 @@ const collection = {
             item: notificationRequests,
         },
         {
-            name: "10. Conversations",
-            description: "Direct messaging conversations and presence status.",
-            item: conversationRequests,
+            name: "10. Payment",
+            description: "Producer earnings calculation, withdraw requests, and payout history.",
+            item: paymentRequests,
         },
     ],
 };
