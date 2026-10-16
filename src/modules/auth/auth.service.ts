@@ -1080,27 +1080,11 @@ export class AuthService {
                 status: true,
                 driverProfile:
                     user.role === "DRIVER"
-                        ? {
-                              select: {
-                                  verificationStatus: true,
-                                  phoneNumber: true,
-                                  address: true,
-                                  city: true,
-                                  region: true,
-                              },
-                          }
+                        ? true
                         : false,
                 producerProfile:
                     user.role === "PRODUCER"
-                        ? {
-                              select: {
-                                  verificationStatus: true,
-                                  phoneNumber: true,
-                                  address: true,
-                                  city: true,
-                                  region: true,
-                              },
-                          }
+                        ? true
                         : false,
                 buyerProfile:
                     user.role === "BUYER"
@@ -1233,6 +1217,7 @@ export class AuthService {
                     select: {
                         verificationStatus: true,
                         allTimeEarnings: true,
+                        farmName:true
                     },
                 },
                 products: {
