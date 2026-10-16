@@ -165,6 +165,7 @@ export class ProductService {
                 availableQuantity: true,
                 sellingUnit: true,
                 sold: true,
+                isActive:true,
                 category: {
                     select: {
                         name: true,
