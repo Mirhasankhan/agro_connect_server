@@ -165,7 +165,7 @@ export class ProductService {
                 availableQuantity: true,
                 sellingUnit: true,
                 sold: true,
-                isActive:true,
+                isActive: true,
                 category: {
                     select: {
                         name: true,
@@ -648,10 +648,22 @@ export class ProductService {
                     },
                 },
                 totalReviews: true,
+                reviews: {
+                    select: {
+                        rating: true,
+                        comment: true,
+                        createdAt: true,
+                        buyer: {
+                            select: {
+                                fullName: true,
+                                profileImage: true,
+                            },
+                        },
+                    },
+                },
                 category: {
                     select: {
                         name: true,
-                        
                     },
                 },
             },
