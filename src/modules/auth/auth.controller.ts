@@ -350,7 +350,6 @@ export class AuthController {
     }
 
     @Put("update-profile")
-    @Roles(UserRole.DRIVER, UserRole.PRODUCER, UserRole.BUYER)
     @UseInterceptors(
         CustomFileInterceptor("profileImage"),
         ParseFormDataInterceptor,

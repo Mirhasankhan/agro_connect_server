@@ -1126,6 +1126,8 @@ export class OrderService {
         };
     }
 
+
+
     async getDriverWiseDeliveries(user: UserPayload) {
         const deliveries = await this.prisma.delivery.findMany({
             where: {
