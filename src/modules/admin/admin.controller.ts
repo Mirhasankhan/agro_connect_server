@@ -26,6 +26,7 @@ import {
     UpdateTermsDto,
     CreateAdminNotificationDto,
     AdminNotificationQueryDto,
+    DeliveryQueryDto,
 } from "./dto/body.dto";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
@@ -249,6 +250,30 @@ export class AdminController {
     @Roles(UserRole.ADMIN)
     async getSentNotifications(@Query() query: AdminNotificationQueryDto) {
         const result = await this.adminService.getSentNotifications(query);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("all-deliveries")
+    @ApiOperation({ summary: "Get all deliveries" })
+    @Roles(UserRole.ADMIN)
+    async getAllDeliveries(@Query() query: DeliveryQueryDto) {
+        const result = await this.adminService.getAllDeliveries(query);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("delivery-details/:id")
+    @ApiOperation({ summary: "Get delivery details" })
+    @Roles(UserRole.ADMIN)
+    async getDeliveryDetails(@Param("id") deliveryId: string) {
+        const result = await this.adminService.getDeliveryDetails(deliveryId);
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,

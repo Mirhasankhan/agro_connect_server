@@ -1,5 +1,6 @@
 import {
     AdminTargetUser,
+    DeliveryStatus,
     DriverVehicleType,
     ProducerType,
     VerificationStatus,
@@ -73,6 +74,24 @@ export class CreateAdminNotificationDto {
 }
 
 export class AdminNotificationQueryDto extends BaseUserQueryDto {}
+
+export class DeliveryQueryDto {
+    @IsOptional()
+    @IsEnum(DeliveryStatus)
+    status?: DeliveryStatus;
+
+    @IsOptional()
+    @IsString()
+    search?: string;
+
+    @IsOptional()
+    @IsString()
+    page?: string;
+
+    @IsOptional()
+    @IsString()
+    limit?: string;
+}
 
 export class ProducerQueryDto extends BaseUserQueryDto {
     @IsOptional()

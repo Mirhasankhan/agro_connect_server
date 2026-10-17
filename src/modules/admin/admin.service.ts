@@ -1,7 +1,7 @@
 import QueryBuilder from "@/common/utils/queryBuilder";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { BadRequestException, HttpStatus, Injectable } from "@nestjs/common";
-import { AdminTargetUser, UserRole } from "@prisma/client";
+import { AdminTargetUser, DeliveryStatus, UserRole } from "@prisma/client";
 import {
     AcceptRejectAccountDto,
     CategoryDto,
@@ -13,6 +13,7 @@ import {
     UpdateTermsDto,
     AdminNotificationQueryDto,
     CreateAdminNotificationDto,
+    DeliveryQueryDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
@@ -942,4 +943,183 @@ export class AdminService {
             data: [summary],
         };
     }
+
+    async getAllDeliveries(query: DeliveryQueryDto) {
+        const page = Math.max(Number(query.page) || 1, 1);
+        const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 100);
+        const skip = (page - 1) * limit;
+        const where = {
+            ...(query.status ? { status: query.status } : {}),
+            ...(query.search
+                ? {
+                      order: {
+                          orderId: {
+                              contains: query.search,
+                              mode: "insensitive" as const,
+                          },
+                      },
+                  }
+                : {}),
+        };
+
+        const [deliveries, total, overviewRows] = await Promise.all([
+            this.prisma.delivery.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: {
+                    createdAt: "desc",
+                },
+                select: {
+                    id: true,
+                    status: true,
+                    createdAt: true,
+                    order: {
+                        select: {
+                            orderId: true,
+                            totalAmount: true,
+                            items: {
+                                select: {
+                                    productName: true,
+                                    quantity: true,
+                                    sellingUnit: true,
+                                },
+                            },
+                            shippingAddress: {
+                                select: {
+                                    addressLine: true,
+                                    city: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+            this.prisma.delivery.count({ where }),
+            this.prisma.delivery.findMany({
+                where,
+                select: {
+                    status: true,
+                    order: {
+                        select: {
+                            totalAmount: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+
+        const statusCounts = Object.values(DeliveryStatus).reduce(
+            (counts, status) => {
+                counts[status] = 0;
+                return counts;
+            },
+            {} as Record<DeliveryStatus, number>,
+        );
+        let totalOrderValue = 0;
+
+        for (const delivery of overviewRows) {
+            statusCounts[delivery.status] += 1;
+            totalOrderValue += delivery.order.totalAmount;
+        }
+
+        return {
+            message: "Deliveries fetched successfully",
+            data: {
+                deliveries,
+                meta: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                },
+                overview: {
+                    totalDeliveries: overviewRows.length,
+                    totalOrderValue,
+                    statusCounts,
+                },
+            },
+        };
+    }
+
+
+        async getDeliveryDetails(deliveryId: string) {
+            const delivery = await this.prisma.delivery.findUniqueOrThrow({
+                where: {
+                    id: deliveryId,                  
+                },
+                select: {
+                    id: true,
+                    status: true,
+                    createdAt: true,
+                    latitude: true,
+                    longitude: true,
+                    updatedAt: true,
+                    driver: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            profileImage: true,
+                            driverProfile: {
+                                select: {
+                                    vehicleColor: true,
+                                    vehicleType: true,
+                                    registrationNumber: true,                                   
+                                    phoneNumber: true,
+                                    model: true,                                    
+                                }
+                            }
+                        }
+                    },
+                    order: {
+                        select: {
+                            orderId: true,
+                            totalAmount: true,
+                            driverReview: {
+                                select: {
+                                    id: true,
+                                    rating: true,
+                                    comment: true,
+                                    createdAt: true,
+                                },
+                            },
+                            items: {
+                                select: {
+                                    productName: true,
+                                    quantity: true,
+                                    sellingUnit: true,
+                                    subtotal: true,
+                                    unitPrice: true,
+                                    product: {
+                                        select: {
+                                            imageUrls: true,
+                                        },
+                                    },
+                                },
+                            },
+                            shippingAddress: {
+                                select: {
+                                    addressLine: true,
+                                    city: true,
+                                    instruction: true,
+                                    postCode: true,
+                                },
+                            },
+                            customer: {
+                                select: {
+                                    fullName: true,
+                                    profileImage: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+    
+            return {
+                message: "Delivery details fetched successfully",
+                data: delivery,
+            };
+        }
 }
