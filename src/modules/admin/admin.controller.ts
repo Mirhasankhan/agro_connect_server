@@ -24,6 +24,8 @@ import {
     BaseUserQueryDto,
     CreateCouponDto,
     UpdateTermsDto,
+    CreateAdminNotificationDto,
+    AdminNotificationQueryDto,
 } from "./dto/body.dto";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
@@ -223,6 +225,30 @@ export class AdminController {
     @Roles(UserRole.ADMIN)
     async getRevenueSummary(@Query() query: EarningSummaryQueryDto) {
         const result = await this.adminService.getRevenusSummary(query);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Post("notifications")
+    @ApiOperation({ summary: "Send a notification to users" })
+    @Roles(UserRole.ADMIN)
+    async sendNotification(@Body() payload: CreateAdminNotificationDto) {
+        const result = await this.adminService.sendNotification(payload);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("notifications")
+    @ApiOperation({ summary: "Get sent admin notifications" })
+    @Roles(UserRole.ADMIN)
+    async getSentNotifications(@Query() query: AdminNotificationQueryDto) {
+        const result = await this.adminService.getSentNotifications(query);
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,

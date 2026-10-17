@@ -427,6 +427,18 @@ model Notification {
   @@map("notifications")
 }
 
+model AdminNotification {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  title        String
+  content      String
+  targetedUser AdminTargetUser
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("adminNotifications")
+}
+
 model Support {
   id       String   @id @default(auto()) @map("_id") @db.ObjectId
   userId   String   @db.ObjectId
@@ -470,12 +482,20 @@ model Term {
 }
 
 enum TNotificationType {
+  Admin
   Profile
   Order
   Payment
   Delivery
   Payout
   Review
+}
+
+enum AdminTargetUser {
+  allUser
+  allDriver
+  allProducer
+  allBuyer
 }
 
 enum OrderStatus {

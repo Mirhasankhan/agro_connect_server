@@ -1,4 +1,5 @@
 import {
+    AdminTargetUser,
     DriverVehicleType,
     ProducerType,
     VerificationStatus,
@@ -59,6 +60,19 @@ export class BaseUserQueryDto {
     @IsString()
     limit?: string;
 }
+
+export class CreateAdminNotificationDto {
+    @IsString()
+    title: string;
+
+    @IsString()
+    content: string;
+
+    @IsEnum(AdminTargetUser)
+    targetedUser: AdminTargetUser;
+}
+
+export class AdminNotificationQueryDto extends BaseUserQueryDto {}
 
 export class ProducerQueryDto extends BaseUserQueryDto {
     @IsOptional()

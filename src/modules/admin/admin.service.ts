@@ -1,7 +1,7 @@
 import QueryBuilder from "@/common/utils/queryBuilder";
 import { PrismaService } from "@/core/services/prisma/prisma.service";
 import { BadRequestException, HttpStatus, Injectable } from "@nestjs/common";
-import { UserRole } from "@prisma/client";
+import { AdminTargetUser, UserRole } from "@prisma/client";
 import {
     AcceptRejectAccountDto,
     CategoryDto,
@@ -11,6 +11,8 @@ import {
     BaseUserQueryDto,
     CreateCouponDto,
     UpdateTermsDto,
+    AdminNotificationQueryDto,
+    CreateAdminNotificationDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
@@ -29,6 +31,69 @@ export class AdminService {
         private fileService: FileService,
         private notificationService: NotificationService,
     ) {}
+
+    async sendNotification(payload: CreateAdminNotificationDto) {
+        const roleByTarget: Record<AdminTargetUser, UserRole | undefined> = {
+            allUser: undefined,
+            allDriver: UserRole.DRIVER,
+            allProducer: UserRole.PRODUCER,
+            allBuyer: UserRole.BUYER,
+        };
+        const role = roleByTarget[payload.targetedUser];
+
+        const users = await this.prisma.user.findMany({
+            where: {
+                deleted: false,
+                ...(role ? { role } : {}),
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        const adminNotification = await this.prisma.adminNotification.create({
+            data: payload,
+        });
+
+        await Promise.all(
+            users.map((user) =>
+                this.notificationService.createNotification({
+                    receiverId: user.id,
+                    title: payload.title,
+                    content: payload.content,
+                    notificationType: "Admin",
+                }),
+            ),
+        );
+
+        return {
+            message: "Notification sent successfully",
+            data: {
+                notification: adminNotification,
+                recipientCount: users.length,
+            },
+        };
+    }
+
+    async getSentNotifications(query: AdminNotificationQueryDto) {
+        const queryBuilder = new QueryBuilder(
+            this.prisma.adminNotification,
+            query,
+        );
+        const response = queryBuilder.sortBy({ createdAt: "desc" }).paginate();
+        const [notifications, pagination] = await Promise.all([
+            response.execute(),
+            response.countTotal(),
+        ]);
+
+        return {
+            message: "Sent notifications fetched successfully",
+            data: {
+                notifications,
+                meta: pagination,
+            },
+        };
+    }
 
     async getAllProducerFromDB(query: ProducerQueryDto) {
         const queryBuilder = new QueryBuilder(this.prisma.user, query);
