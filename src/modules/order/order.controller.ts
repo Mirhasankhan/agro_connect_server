@@ -266,4 +266,23 @@ export class OrderController {
             data: deliveries,
         });
     }
+
+    @Get("/delivery-details/:id")
+    @Roles(UserRole.DRIVER)
+    @ApiOperation({ summary: "Get delivery details for a specific order" })
+    async getDeliveryDetailsForDriver(
+        @Req() req: Request,
+        @Param("id") deliveryId: string,
+    ) {
+        const user = req.user as UserPayload;
+        const deliveryDetails =
+            await this.orderService.getDeliveryDetails(user, deliveryId);
+
+        // Return the response with a success message and the fetched delivery details
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "Delivery details fetched successfully",
+            data: deliveryDetails,
+        });
+    }
 }

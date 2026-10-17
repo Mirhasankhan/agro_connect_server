@@ -1133,7 +1133,7 @@ export class OrderService {
             },
             select: {
                 id: true,
-                status: true,             
+                status: true,
                 createdAt: true,
                 order: {
                     select: {
@@ -1148,12 +1148,11 @@ export class OrderService {
                         },
                         shippingAddress: {
                             select: {
-                                addressLine:true,
-                                city:true,
+                                addressLine: true,
+                                city: true,
                             },
-                        }
+                        },
                     },
-                    
                 },
             },
         });
@@ -1161,6 +1160,70 @@ export class OrderService {
         return {
             message: "Deliveries fetched successfully",
             data: deliveries,
+        };
+    }
+
+    async getDeliveryDetails(user: UserPayload, deliveryId: string) {
+        const delivery = await this.prisma.delivery.findUniqueOrThrow({
+            where: {
+                id: deliveryId,
+                driverId: user.id,
+            },
+            select: {
+                id: true,
+                status: true,
+                createdAt: true,
+                latitude: true,
+                longitude: true,
+                updatedAt: true,
+                order: {
+                    select: {
+                        orderId: true,
+                        totalAmount: true,
+                        driverReview: {
+                            select: {
+                                id: true,
+                                rating: true,
+                                comment: true,
+                                createdAt: true,
+                            },
+                        },
+                        items: {
+                            select: {
+                                productName: true,
+                                quantity: true,
+                                sellingUnit: true,
+                                subtotal: true,
+                                unitPrice: true,
+                                product: {
+                                    select: {
+                                        imageUrls: true,
+                                    },
+                                },
+                            },
+                        },
+                        shippingAddress: {
+                            select: {
+                                addressLine: true,
+                                city: true,
+                                instruction: true,
+                                postCode: true,
+                            },
+                        },
+                        customer: {
+                            select: {
+                                fullName: true,
+                                profileImage: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        return {
+            message: "Delivery details fetched successfully",
+            data: delivery,
         };
     }
 
