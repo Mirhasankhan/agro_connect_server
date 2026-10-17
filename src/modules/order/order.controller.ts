@@ -249,4 +249,21 @@ export class OrderController {
             message: result.message,
         });
     }
+
+    @Get("/driver-wise")
+    @Roles(UserRole.DRIVER)
+    @ApiOperation({ summary: "Get driver-wise deliveries" })
+    async getDriverWiseDeliveries(@Req() req: Request) {
+        const user = req.user as UserPayload;
+        const deliveries = await this.orderService.getDriverWiseDeliveries(
+            user,
+        );
+
+        // Return the response with a success message and the fetched deliveries
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: "Deliveries fetched successfully",
+            data: deliveries,
+        });
+    }
 }

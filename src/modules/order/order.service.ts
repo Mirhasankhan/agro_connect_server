@@ -753,7 +753,7 @@ export class OrderService {
                                 updatedAt: true,
                                 driver: {
                                     select: {
-                                        fullName: true,                                      
+                                        fullName: true,
                                         profileImage: true,
                                         driverProfile: {
                                             select: {
@@ -1123,6 +1123,44 @@ export class OrderService {
 
         return {
             message: "Navigation updated successfully",
+        };
+    }
+
+    async getDriverWiseDeliveries(user: UserPayload) {
+        const deliveries = await this.prisma.delivery.findMany({
+            where: {
+                driverId: user.id,
+            },
+            select: {
+                id: true,
+                status: true,             
+                createdAt: true,
+                order: {
+                    select: {
+                        orderId: true,
+                        totalAmount: true,
+                        items: {
+                            select: {
+                                productName: true,
+                                quantity: true,
+                                sellingUnit: true,
+                            },
+                        },
+                        shippingAddress: {
+                            select: {
+                                addressLine:true,
+                                city:true,
+                            },
+                        }
+                    },
+                    
+                },
+            },
+        });
+
+        return {
+            message: "Deliveries fetched successfully",
+            data: deliveries,
         };
     }
 
