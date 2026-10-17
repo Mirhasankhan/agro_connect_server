@@ -14,6 +14,7 @@ import {
     AdminNotificationQueryDto,
     CreateAdminNotificationDto,
     DeliveryQueryDto,
+    SupportQueryDto,
 } from "./dto/body.dto";
 import { ApiError } from "@/common/errors/api_error";
 import { FileService } from "@/core/services/files/cloudinary.service";
@@ -905,8 +906,7 @@ export class AdminService {
                                     createdAt.getMonth() === monthIndex,
                             )
                             .reduce(
-                                (total, { totalAmount }) =>
-                                    total + totalAmount,
+                                (total, { totalAmount }) => total + totalAmount,
                                 0,
                             ),
                     ),
@@ -1042,84 +1042,103 @@ export class AdminService {
         };
     }
 
-
-        async getDeliveryDetails(deliveryId: string) {
-            const delivery = await this.prisma.delivery.findUniqueOrThrow({
-                where: {
-                    id: deliveryId,                  
-                },
-                select: {
-                    id: true,
-                    status: true,
-                    createdAt: true,
-                    latitude: true,
-                    longitude: true,
-                    updatedAt: true,
-                    driver: {
-                        select: {
-                            id: true,
-                            fullName: true,
-                            email: true,
-                            profileImage: true,
-                            driverProfile: {
-                                select: {
-                                    vehicleColor: true,
-                                    vehicleType: true,
-                                    registrationNumber: true,                                   
-                                    phoneNumber: true,
-                                    model: true,                                    
-                                }
-                            }
-                        }
-                    },
-                    order: {
-                        select: {
-                            orderId: true,
-                            totalAmount: true,
-                            driverReview: {
-                                select: {
-                                    id: true,
-                                    rating: true,
-                                    comment: true,
-                                    createdAt: true,
-                                },
-                            },
-                            items: {
-                                select: {
-                                    productName: true,
-                                    quantity: true,
-                                    sellingUnit: true,
-                                    subtotal: true,
-                                    unitPrice: true,
-                                    product: {
-                                        select: {
-                                            imageUrls: true,
-                                        },
-                                    },
-                                },
-                            },
-                            shippingAddress: {
-                                select: {
-                                    addressLine: true,
-                                    city: true,
-                                    instruction: true,
-                                    postCode: true,
-                                },
-                            },
-                            customer: {
-                                select: {
-                                    fullName: true,
-                                    profileImage: true,
-                                },
+    async getDeliveryDetails(deliveryId: string) {
+        const delivery = await this.prisma.delivery.findUniqueOrThrow({
+            where: {
+                id: deliveryId,
+            },
+            select: {
+                id: true,
+                status: true,
+                createdAt: true,
+                latitude: true,
+                longitude: true,
+                updatedAt: true,
+                driver: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        profileImage: true,
+                        driverProfile: {
+                            select: {
+                                vehicleColor: true,
+                                vehicleType: true,
+                                registrationNumber: true,
+                                phoneNumber: true,
+                                model: true,
                             },
                         },
                     },
                 },
-            });
-    
-            return {
-                message: "Delivery details fetched successfully",
-                data: delivery,
-            };
-        }
+                order: {
+                    select: {
+                        orderId: true,
+                        totalAmount: true,
+                        driverReview: {
+                            select: {
+                                id: true,
+                                rating: true,
+                                comment: true,
+                                createdAt: true,
+                            },
+                        },
+                        items: {
+                            select: {
+                                productName: true,
+                                quantity: true,
+                                sellingUnit: true,
+                                subtotal: true,
+                                unitPrice: true,
+                                product: {
+                                    select: {
+                                        imageUrls: true,
+                                    },
+                                },
+                            },
+                        },
+                        shippingAddress: {
+                            select: {
+                                addressLine: true,
+                                city: true,
+                                instruction: true,
+                                postCode: true,
+                            },
+                        },
+                        customer: {
+                            select: {
+                                fullName: true,
+                                profileImage: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        return {
+            message: "Delivery details fetched successfully",
+            data: delivery,
+        };
+    }
+
+    async getAllSupportMessages(query: SupportQueryDto) {
+        const queryBuilder = new QueryBuilder(this.prisma.support, query);
+        const response = queryBuilder
+            .sortBy({ createdAt: "desc" })
+            .paginate();
+
+        const [supportMessages, pagination] = await Promise.all([
+            response.execute(),
+            response.countTotal(),
+        ]);
+
+        return {
+            message: "Support messages fetched successfully",
+            data: {
+                supportMessages,
+                meta: pagination,
+            },
+        };
+    }
 }

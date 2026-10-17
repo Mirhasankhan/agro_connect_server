@@ -27,6 +27,7 @@ import {
     CreateAdminNotificationDto,
     AdminNotificationQueryDto,
     DeliveryQueryDto,
+    SupportQueryDto,
 } from "./dto/body.dto";
 import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
@@ -274,6 +275,18 @@ export class AdminController {
     @Roles(UserRole.ADMIN)
     async getDeliveryDetails(@Param("id") deliveryId: string) {
         const result = await this.adminService.getDeliveryDetails(deliveryId);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("support-messages")
+    @ApiOperation({ summary: "Get all support messages" })
+    @Roles(UserRole.ADMIN)
+    async getAllSupportMessages(@Query() query: SupportQueryDto) {
+        const result = await this.adminService.getAllSupportMessages(query);
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,

@@ -75,6 +75,16 @@ export class CreateAdminNotificationDto {
 
 export class AdminNotificationQueryDto extends BaseUserQueryDto {}
 
+export class SupportQueryDto {
+    @IsOptional()
+    @IsString()
+    page?: string;
+
+    @IsOptional()
+    @IsString()
+    limit?: string;
+}
+
 export class DeliveryQueryDto {
     @IsOptional()
     @IsEnum(DeliveryStatus)
