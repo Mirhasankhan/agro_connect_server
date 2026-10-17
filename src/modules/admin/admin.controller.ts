@@ -29,6 +29,7 @@ import { CustomFileInterceptor } from "@/common/interceptors/file_interceptors";
 import { ParseFormDataInterceptor } from "@/common/interceptors/form_data_interceptor";
 import { IsPublic } from "@/common/decorators/auth.decorator";
 import { OrderQueryDto } from "../order/dto/body.dto";
+import { EarningSummaryQueryDto } from "../payment/dto/body.dto";
 
 @ApiTags("Admin")
 @Controller("admin")
@@ -198,6 +199,30 @@ export class AdminController {
     @Roles(UserRole.ADMIN)
     async getOrderById(@Param("id") orderId: string) {
         const result = await this.adminService.getOrderById(orderId);
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("overview")
+    @ApiOperation({ summary: "Get admin overview data" })
+    @Roles(UserRole.ADMIN)
+    async getAdminOverviewData() {
+        const result = await this.adminService.getAdminOverviewData();
+        return ResponseService.formatResponse({
+            statusCode: HttpStatus.OK,
+            message: result.message,
+            data: result.data,
+        });
+    }
+
+    @Get("revenue-summary")
+    @ApiOperation({ summary: "Get admin revenue summary" })
+    @Roles(UserRole.ADMIN)
+    async getRevenueSummary(@Query() query: EarningSummaryQueryDto) {
+        const result = await this.adminService.getRevenusSummary(query);
         return ResponseService.formatResponse({
             statusCode: HttpStatus.OK,
             message: result.message,

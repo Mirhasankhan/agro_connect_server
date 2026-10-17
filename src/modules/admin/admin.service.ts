@@ -17,6 +17,10 @@ import { FileService } from "@/core/services/files/cloudinary.service";
 import { OrderQueryDto } from "../order/dto/body.dto";
 import { background } from "@/common/utils/background";
 import { NotificationService } from "../notification/notification.service";
+import {
+    EarningSummaryQueryDto,
+    EarningSummaryType,
+} from "../payment/dto/body.dto";
 
 @Injectable()
 export class AdminService {
@@ -672,5 +676,205 @@ export class AdminService {
         };
     }
 
+    async getAdminOverviewData() {
+        const [
+            totalUsers,
+            totalProducers,
+            totalDrivers,
+            totalBuyers,
+            totalOrders,
+            totalRevenue,
+            onlineDrivers,
+            delivered,
+            active,
+            cancelled,
+        ] = await Promise.all([
+            this.prisma.user.count({
+                where: {
+                    role: {
+                        not: UserRole.ADMIN,
+                    },
+                },
+            }),
+            this.prisma.user.count({
+                where: {
+                    role: "PRODUCER",
+                },
+            }),
+            this.prisma.user.count({
+                where: {
+                    role: "DRIVER",
+                },
+            }),
+            this.prisma.user.count({
+                where: {
+                    role: "BUYER",
+                },
+            }),
+            this.prisma.order.count(),
+            this.prisma.order.aggregate({
+                where: {
+                    paymentStatus: "Paid",
+                },
+                _sum: {
+                    totalAmount: true,
+                },
+            }),
+            this.prisma.driverProfile.count({
+                where: {
+                    isAvailable: true,
+                },
+            }),
+            this.prisma.order.count({
+                where: {
+                    status: "Delivered",
+                },
+            }),
+            this.prisma.order.count({
+                where: {
+                    status: "Active",
+                },
+            }),
+            this.prisma.order.count({
+                where: {
+                    status: "Cancelled",
+                },
+            }),
+        ]);
+        return {
+            message: "Admin overview data fetched successfully",
+            data: {
+                totalUsers,
+                totalProducers,
+                totalDrivers,
+                totalBuyers,
+                totalOrders,
+                totalRevenue,
+                onlineDrivers,
+                delivered,
+                active,
+                cancelled,
+            },
+        };
+    }
 
+    async getRevenusSummary({ type }: EarningSummaryQueryDto) {
+        const paidOrders = await this.prisma.order.findMany({
+            where: {
+                paymentStatus: "Paid",
+            },
+            select: {
+                totalAmount: true,
+                createdAt: true,
+            },
+        });
+
+        const roundRevenue = (amount: number) => Number(amount.toFixed(2));
+
+        if (type === EarningSummaryType.WEEKLY) {
+            const dayNames = ["sat", "sun", "mon", "tue", "wed", "thu", "fri"];
+            const currentDate = new Date();
+            const currentDay = currentDate.getDay();
+            const daysSinceSaturday = (currentDay + 1) % 7;
+            const weekStart = new Date(currentDate);
+            weekStart.setHours(0, 0, 0, 0);
+            weekStart.setDate(currentDate.getDate() - daysSinceSaturday);
+
+            const summary = Object.fromEntries(
+                dayNames.map((day, index) => {
+                    const dayStart = new Date(weekStart);
+                    dayStart.setDate(weekStart.getDate() + index);
+                    const dayEnd = new Date(dayStart);
+                    dayEnd.setDate(dayStart.getDate() + 1);
+
+                    return [
+                        day,
+                        roundRevenue(
+                            paidOrders
+                                .filter(
+                                    ({ createdAt }) =>
+                                        createdAt >= dayStart &&
+                                        createdAt < dayEnd,
+                                )
+                                .reduce(
+                                    (total, { totalAmount }) =>
+                                        total + totalAmount,
+                                    0,
+                                ),
+                        ),
+                    ];
+                }),
+            );
+
+            return {
+                message: "Admin weekly revenue fetched successfully",
+                data: [summary],
+            };
+        }
+
+        if (type === EarningSummaryType.MONTHLY) {
+            const monthNames = [
+                "jan",
+                "feb",
+                "mar",
+                "apr",
+                "may",
+                "jun",
+                "jul",
+                "aug",
+                "sep",
+                "oct",
+                "nov",
+                "dec",
+            ];
+            const currentYear = new Date().getFullYear();
+            const summary = Object.fromEntries(
+                monthNames.map((month, monthIndex) => [
+                    month,
+                    roundRevenue(
+                        paidOrders
+                            .filter(
+                                ({ createdAt }) =>
+                                    createdAt.getFullYear() === currentYear &&
+                                    createdAt.getMonth() === monthIndex,
+                            )
+                            .reduce(
+                                (total, { totalAmount }) =>
+                                    total + totalAmount,
+                                0,
+                            ),
+                    ),
+                ]),
+            );
+
+            return {
+                message: "Admin monthly revenue fetched successfully",
+                data: [summary],
+            };
+        }
+
+        const yearlySummary = new Map<number, number>();
+
+        for (const { totalAmount, createdAt } of paidOrders) {
+            const year = createdAt.getFullYear();
+            yearlySummary.set(
+                year,
+                (yearlySummary.get(year) ?? 0) + totalAmount,
+            );
+        }
+
+        const summary = Object.fromEntries(
+            [...yearlySummary.entries()]
+                .sort(([firstYear], [secondYear]) => firstYear - secondYear)
+                .map(([year, amount]) => [
+                    year.toString(),
+                    roundRevenue(amount),
+                ]),
+        );
+
+        return {
+            message: "Admin yearly revenue fetched successfully",
+            data: [summary],
+        };
+    }
 }
